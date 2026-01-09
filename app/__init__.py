@@ -1,0 +1,2 @@
+"""RAGLite FastAPI application package."""
+
