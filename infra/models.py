@@ -31,7 +31,8 @@ class Tenant(Base):
     __tablename__ = "tenants"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     datasets = relationship("Dataset", back_populates="tenant")
@@ -44,7 +45,7 @@ class ApiKey(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     tenant_id: Mapped[str] = mapped_column(String, ForeignKey("tenants.id"), nullable=False)
     name: Mapped[str] = mapped_column(String, nullable=False)
-    key: Mapped[str] = mapped_column(String, nullable=False)  # store hashed in real implementation
+    key_hash: Mapped[str] = mapped_column(String, nullable=False)
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -72,9 +73,11 @@ class Document(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     tenant_id: Mapped[str] = mapped_column(String, nullable=False)
     dataset_id: Mapped[str] = mapped_column(String, ForeignKey("datasets.id"), nullable=False)
+    path: Mapped[str | None] = mapped_column(String, nullable=True)
     source_uri: Mapped[str | None] = mapped_column(String, nullable=True)
     filename: Mapped[str | None] = mapped_column(String, nullable=True)
     mime_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    language: Mapped[str | None] = mapped_column(String, nullable=True)
     size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     content_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     status: Mapped[str] = mapped_column(String, default="pending")

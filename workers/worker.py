@@ -11,7 +11,7 @@ def _load_celery():
     try:
         from celery import Celery
     except ImportError:  # pragma: no cover - dev placeholder
-        raise RuntimeError("Celery is not installed; install to run workers.")
+        return None
     return Celery(
         "raglite",
         broker=settings.redis_url,
@@ -35,7 +35,13 @@ def task(*args, **kwargs) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
 
     def wrapper(fn: Callable[..., Any]) -> Callable[..., Any]:
         app = get_celery_app()
+        if app is None:
+            # attach a .delay shim that calls the function directly
+            def delay(*dargs, **dkwargs):
+                return fn(*dargs, **dkwargs)
+
+            fn.delay = delay  # type: ignore[attr-defined]
+            return fn
         return app.task(*args, **kwargs)(fn)
 
     return wrapper
-

@@ -1,0 +1,33 @@
+[project]
+name = "raglite"
+version = "0.1.0"
+description = "Spec-driven RAGLite API + worker"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "sqlalchemy",
+    "pydantic",
+    "pydantic-settings",
+    "qdrant-client",
+    "celery",
+    "redis",
+    "pypdf",
+    "sentence-transformers",
+    "beautifulsoup4",
+    "passlib[bcrypt]",
+    "python-docx",
+    "markdown",
+    "rank-bm25",
+    "opensearch-py",
+    "requests",
+    "langdetect",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = ["pytest"]
+
+[tool.uv]
+dev-dependencies = ["pytest"]

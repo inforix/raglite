@@ -82,6 +82,8 @@ class QueryRewriter:
 
 ## Runtime Defaults
 - API listens on port `7615` (override via env).
+- Dev metadata store defaults to SQLite (`sqlite:///./raglite.db`); use Postgres in production.
+- Production hardening: set `RAGLITE_ENV=prod`, disable bootstrap keys (`RAGLITE_ENABLE_BOOTSTRAP=false`), set `RAGLITE_ALLOWED_ORIGINS` for CORS, point `RAGLITE_POSTGRES_DSN`/`RAGLITE_REDIS_URL`/`RAGLITE_QDRANT_URL` to production services.
 
 ## Embedding Configuration
 - Administrator sets an allowed embedder list (model id + dimension); default `sentence-transformers/all-MiniLM-L6-v2`.
@@ -90,9 +92,13 @@ class QueryRewriter:
 ## Minimal Tech Choices
 - Python 3.12+, FastAPI, SQLAlchemy, Pydantic, Celery + Redis, Postgres, Qdrant (or pgvector).
 - Embedding defaults: `sentence-transformers/all-MiniLM-L6-v2` (local download) with batching.
-- Rerank (optional): `cross-encoder/ms-marco-MiniLM-L-2-v2`.
+- Rerank (optional): `cross-encoder/ms-marco-MiniLM-L-2-v2` (set `RAGLITE_RERANKER_MODEL`).
 - Docker Compose for local: api + worker + redis + qdrant + postgres.
 - Limits: max 10 files per upload, 25 MB each; allowed MIME: txt/md/html/pdf; parse timeout 10s before offloading.
+- Dev setup: use `uv` for dependency management (`pyproject.toml`); `uv sync` to install, `uv run uvicorn app.main:app --reload --port 7615`; `uv run celery -A workers.worker.celery_app worker --loglevel=info` for workers. `sentence-transformers` may take longer to install (retry with longer timeout); HTML parsing uses BeautifulSoup, PDF via pypdf.
+- Rate limiting: default 60 requests/min per tenant via in-memory limiter; adjust with `RAGLITE_RATE_LIMIT_PER_MINUTE`.
+- Hugging Face mirror: set `HF_ENDPOINT=https://hf-mirror.com` (or other mirror) before installing/using sentence-transformers if downloads are slow.
+- OpenSearch BM25: set `RAGLITE_OPENSEARCH_URL` (and optional `RAGLITE_OPENSEARCH_USER`/`RAGLITE_OPENSEARCH_PASSWORD`), `RAGLITE_OPENSEARCH_VERIFY_CERTS`, and `RAGLITE_OPENSEARCH_INDEX_PREFIX`. BM25 uses OpenSearch; ensure the cluster is reachable.
 
 ## Roadmap / Non-goals
 - Roadmap: connectors (HTTP URL fetch, S3/OSS, Confluence/Notion/Google Drive/Discord) with schedulable sync; template-based chunkers.
@@ -110,10 +116,11 @@ def query(payload: QueryRequest, tenant=Depends(auth)):
 ```
 
 ## Next Steps
-- Scaffold FastAPI service + worker, wire settings.
-- Implement storage adapters: local FS loader, Qdrant/pgvector vector store, Postgres migrations.
-- Add chunkers (by tokens and by characters) and MIME-specific loaders.
-- Write integration tests for ingestion pipeline and query path across tenants.
+- Wire production DB/Redis/Qdrant and add Alembic migrations for schema.
+- Replace in-memory rate limiter/cache with Redis-based implementations.
+- Add richer parsers (Docx/OCR) and hybrid BM25 (e.g., Elastic) plus reranker defaults.
+- Add auth management endpoints (rotate/revoke keys) and hashed key rotation tooling.
+- Expand tests: integration for ingest→query across tenants; vector store adapter tests; reranker/rewriter coverage.
 
 ## Specs
 - See `specs/000-raglite-spec.md` (v0.1 Approved); update specs before implementation changes.

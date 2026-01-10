@@ -1,6 +1,16 @@
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, conint
+from pydantic import BaseModel, Field, conint, ConfigDict
+
+
+class TenantCreate(BaseModel):
+    name: str
+
+
+class TenantOut(BaseModel):
+    id: str
+    name: str
+    api_key: str
 
 
 class DatasetCreate(BaseModel):
@@ -10,13 +20,11 @@ class DatasetCreate(BaseModel):
 
 
 class DatasetOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     name: str
     description: Optional[str] = None
     embedder: Optional[str] = None
-
-    class Config:
-        orm_mode = True
 
 
 class DocumentUploadResponse(BaseModel):
@@ -24,13 +32,11 @@ class DocumentUploadResponse(BaseModel):
 
 
 class JobOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
     id: str
     status: str
     progress: conint(ge=0, le=100) = 0
     error: Optional[str] = None
-
-    class Config:
-        orm_mode = True
 
 
 class QueryRequest(BaseModel):
@@ -38,6 +44,7 @@ class QueryRequest(BaseModel):
     dataset_ids: Optional[List[str]] = None
     k: conint(gt=0, le=50) = 5
     rewrite: bool = True
+    filters: Optional[dict] = None
 
 
 class QueryHit(BaseModel):
@@ -54,4 +61,3 @@ class QueryResponse(BaseModel):
     query: str
     rewritten: Optional[str] = None
     results: List[QueryHit] = Field(default_factory=list)
-
