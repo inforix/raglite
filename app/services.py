@@ -104,13 +104,13 @@ def create_tenant_with_key(db: Session, payload: TenantCreate) -> TenantOut:
     db.add(api_key)
     db.commit()
     db.refresh(tenant)
-    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key=api_key_value)
+    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key=api_key_value, created_at=tenant.created_at)
 
 
 def list_tenants(db: Session) -> List[TenantOut]:
     rows = db.query(models.Tenant).all()
     # Don't expose API keys in list responses
-    return [TenantOut(id=t.id, name=t.name, description=t.description, api_key="***") for t in rows]
+    return [TenantOut(id=t.id, name=t.name, description=t.description, api_key="***", created_at=t.created_at) for t in rows]
 
 
 def get_tenant(db: Session, tenant_id: str) -> TenantOut:
@@ -119,7 +119,7 @@ def get_tenant(db: Session, tenant_id: str) -> TenantOut:
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
     # Mask API key since we only store the hash
-    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key="***")
+    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key="***", created_at=tenant.created_at)
 
 
 def update_tenant(db: Session, tenant_id: str, payload: TenantCreate) -> TenantOut:
@@ -139,7 +139,7 @@ def update_tenant(db: Session, tenant_id: str, payload: TenantCreate) -> TenantO
     tenant.description = payload.description
     db.commit()
     db.refresh(tenant)
-    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key=None)
+    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key=None, created_at=tenant.created_at)
 
 
 def delete_tenant(db: Session, tenant_id: str):
