@@ -9,7 +9,7 @@ from app import services
 from app.config import get_settings
 from app.dedup import find_duplicate_document
 from app.deps import TenantContext, get_tenant
-from app.schemas import DatasetCreate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse
+from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse, DocumentOut, DocumentUpdate, DocumentListResponse
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
@@ -63,6 +63,16 @@ async def list_datasets(tenant: TenantContext = Depends(get_tenant), db: Session
 @router.get("/datasets/{dataset_id}", tags=["datasets"], response_model=DatasetOut)
 async def get_dataset(dataset_id: str, tenant: TenantContext = Depends(get_tenant), db: Session = Depends(get_db)) -> DatasetOut:
     return services.get_dataset(db, tenant.tenant_id, dataset_id)
+
+
+@router.put("/datasets/{dataset_id}", tags=["datasets"], response_model=DatasetOut)
+async def update_dataset(
+    dataset_id: str,
+    payload: DatasetUpdate,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db)
+) -> DatasetOut:
+    return services.update_dataset(db, tenant.tenant_id, dataset_id, payload)
 
 
 @router.post("/documents", status_code=status.HTTP_202_ACCEPTED, tags=["documents"], response_model=DocumentUploadResponse)
@@ -129,6 +139,43 @@ async def upload_documents(
     docs = services.record_documents(db, tenant.tenant_id, dataset_id, uploads)
     job_resp = services.create_document_jobs(db, tenant.tenant_id, dataset_id, docs, dataset.embedder)
     return job_resp
+
+
+@router.get("/documents", tags=["documents"], response_model=DocumentListResponse)
+async def list_documents(
+    dataset_id: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 20,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> DocumentListResponse:
+    """List documents with pagination. Optionally filter by dataset_id."""
+    if page < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
+    if page_size < 1 or page_size > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page size must be between 1 and 100")
+    return services.list_documents(db, tenant.tenant_id, dataset_id, page, page_size)
+
+
+@router.get("/documents/{document_id}", tags=["documents"], response_model=DocumentOut)
+async def get_document(
+    document_id: str,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> DocumentOut:
+    """Get a single document by ID."""
+    return services.get_document(db, tenant.tenant_id, document_id)
+
+
+@router.put("/documents/{document_id}", tags=["documents"], response_model=DocumentOut)
+async def update_document(
+    document_id: str,
+    payload: DocumentUpdate,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> DocumentOut:
+    """Update document metadata (filename, source_uri)."""
+    return services.update_document(db, tenant.tenant_id, document_id, payload)
 
 
 @router.delete("/datasets/{dataset_id}", status_code=status.HTTP_202_ACCEPTED, tags=["datasets"])

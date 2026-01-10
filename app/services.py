@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 
 from app.config import get_settings
-from app.schemas import DatasetCreate, DatasetOut, DocumentUploadResponse, JobOut
+from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import storage, vectorstore
 from infra import models
@@ -65,6 +65,40 @@ def get_dataset(db: Session, tenant_id: str, dataset_id: str) -> DatasetOut:
     )
     if not ds:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    return DatasetOut(
+        id=ds.id,
+        name=ds.name,
+        description=ds.description,
+        embedder=ds.embedder,
+    )
+
+
+def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: DatasetUpdate) -> DatasetOut:
+    """Update a dataset."""
+    ds = (
+        db.query(models.Dataset)
+        .filter(
+            models.Dataset.id == dataset_id,
+            models.Dataset.tenant_id == tenant_id,
+            models.Dataset.deleted_at.is_(None)
+        )
+        .first()
+    )
+    if not ds:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    
+    # Update only provided fields
+    if payload.name is not None:
+        ds.name = payload.name
+    if payload.description is not None:
+        ds.description = payload.description
+    if payload.embedder is not None:
+        if payload.embedder not in settings.allowed_embedders:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
+        ds.embedder = payload.embedder
+    
+    db.commit()
+    db.refresh(ds)
     return DatasetOut(
         id=ds.id,
         name=ds.name,
@@ -278,6 +312,107 @@ def soft_delete_document(db: Session, tenant_id: str, document_id: str):
             client.delete_document(tenant_id, doc.dataset_id, document_id)
     except Exception:
         pass
+
+
+def list_documents(db: Session, tenant_id: str, dataset_id: Optional[str] = None, page: int = 1, page_size: int = 20) -> DocumentListResponse:
+    """List documents with pagination."""
+    query = db.query(models.Document).filter(
+        models.Document.tenant_id == tenant_id,
+        models.Document.deleted_at.is_(None)
+    )
+    if dataset_id:
+        query = query.filter(models.Document.dataset_id == dataset_id)
+    
+    total = query.count()
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    
+    offset = (page - 1) * page_size
+    docs = query.order_by(models.Document.created_at.desc()).offset(offset).limit(page_size).all()
+    
+    items = [
+        DocumentOut(
+            id=d.id,
+            dataset_id=d.dataset_id,
+            filename=d.filename,
+            mime_type=d.mime_type,
+            size_bytes=d.size_bytes,
+            language=d.language,
+            status=d.status,
+            source_uri=d.source_uri,
+            created_at=d.created_at.isoformat() if d.created_at else ""
+        )
+        for d in docs
+    ]
+    
+    return DocumentListResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages
+    )
+
+
+def get_document(db: Session, tenant_id: str, document_id: str) -> DocumentOut:
+    """Get a single document by ID."""
+    doc = (
+        db.query(models.Document)
+        .filter(
+            models.Document.id == document_id,
+            models.Document.tenant_id == tenant_id,
+            models.Document.deleted_at.is_(None)
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    return DocumentOut(
+        id=doc.id,
+        dataset_id=doc.dataset_id,
+        filename=doc.filename,
+        mime_type=doc.mime_type,
+        size_bytes=doc.size_bytes,
+        language=doc.language,
+        status=doc.status,
+        source_uri=doc.source_uri,
+        created_at=doc.created_at.isoformat() if doc.created_at else ""
+    )
+
+
+def update_document(db: Session, tenant_id: str, document_id: str, payload: DocumentUpdate) -> DocumentOut:
+    """Update a document's metadata."""
+    doc = (
+        db.query(models.Document)
+        .filter(
+            models.Document.id == document_id,
+            models.Document.tenant_id == tenant_id,
+            models.Document.deleted_at.is_(None)
+        )
+        .first()
+    )
+    if not doc:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    
+    # Update only provided fields
+    if payload.filename is not None:
+        doc.filename = payload.filename
+    if payload.source_uri is not None:
+        doc.source_uri = payload.source_uri
+    
+    db.commit()
+    db.refresh(doc)
+    return DocumentOut(
+        id=doc.id,
+        dataset_id=doc.dataset_id,
+        filename=doc.filename,
+        mime_type=doc.mime_type,
+        size_bytes=doc.size_bytes,
+        language=doc.language,
+        status=doc.status,
+        source_uri=doc.source_uri,
+        created_at=doc.created_at.isoformat() if doc.created_at else ""
+    )
 
 
 def get_job(db: Session, tenant_id: str, job_id: str) -> JobOut:

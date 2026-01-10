@@ -21,6 +21,12 @@ class DatasetCreate(BaseModel):
     embedder: Optional[str] = None
 
 
+class DatasetUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+    embedder: Optional[str] = None
+
+
 class DatasetOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
@@ -39,6 +45,32 @@ class JobOut(BaseModel):
     status: str
     progress: conint(ge=0, le=100) = 0
     error: Optional[str] = None
+
+
+class DocumentOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    dataset_id: str
+    filename: Optional[str] = None
+    mime_type: Optional[str] = None
+    size_bytes: Optional[int] = None
+    language: Optional[str] = None
+    status: str
+    source_uri: Optional[str] = None
+    created_at: str
+
+
+class DocumentUpdate(BaseModel):
+    filename: Optional[str] = None
+    source_uri: Optional[str] = None
+
+
+class DocumentListResponse(BaseModel):
+    items: List[DocumentOut] = Field(default_factory=list)
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
 
 
 class QueryRequest(BaseModel):
