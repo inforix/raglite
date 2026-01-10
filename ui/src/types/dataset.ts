@@ -1,0 +1,20 @@
+export interface Dataset {
+  id: string;
+  tenant_id: string;
+  name: string;
+  language?: string;
+  created_at?: string;
+  updated_at?: string;
+  document_count?: number;
+}
+
+export interface CreateDatasetRequest {
+  tenant_id: string;
+  name: string;
+  language?: string;
+}
+
+export interface UpdateDatasetRequest {
+  name?: string;
+  language?: string;
+}

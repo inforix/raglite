@@ -11,6 +11,7 @@ from app.dedup import find_duplicate_document
 from app.deps import TenantContext, get_tenant
 from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse, DocumentOut, DocumentUpdate, DocumentListResponse
 from app.schemas_tenant import TenantCreate, TenantOut
+from app.schemas_auth import LoginRequest, LoginResponse, UserOut
 from core import embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
 from infra import models
@@ -263,3 +264,43 @@ async def reindex(dataset_id: str, embedder: Optional[str] = None, tenant: Tenan
     job_id = services.create_reindex_job(db, tenant.tenant_id, dataset_id, target_embedder)
     services.enqueue_reindex_job(job_id, tenant.tenant_id, dataset_id, target_embedder)
     return {"status": "accepted", "job_id": job_id, "dataset_id": dataset_id, "embedder": target_embedder}
+
+
+# Authentication endpoints
+@router.post("/auth/login", tags=["auth"], response_model=LoginResponse)
+async def login(payload: LoginRequest):
+    """
+    Mock login endpoint for demo purposes.
+    In production, implement proper authentication with password hashing and JWT tokens.
+    """
+    # For demo: accept any email/password
+    user = UserOut(
+        id=str(uuid.uuid4()),
+        email=payload.email,
+        name="Admin User"
+    )
+    return LoginResponse(user=user)
+
+
+@router.get("/auth/me", tags=["auth"], response_model=UserOut)
+async def get_current_user():
+    """
+    Get current user info.
+    In production, this should validate the JWT token and return the actual user.
+    """
+    # For demo: return a mock user
+    return UserOut(
+        id=str(uuid.uuid4()),
+        email="admin@example.com",
+        name="Admin User"
+    )
+
+
+@router.post("/auth/logout", tags=["auth"])
+async def logout():
+    """
+    Logout endpoint.
+    In production, this should invalidate the JWT token.
+    """
+    return {"status": "ok", "message": "Logged out successfully"}
+

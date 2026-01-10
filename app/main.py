@@ -1,7 +1,11 @@
 import logging
+import os
+from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
 from app.api import api_router
 from app.config import get_settings
@@ -109,3 +113,17 @@ async def bootstrap_api_key():
 @app.get("/health", tags=["meta"])
 async def health():
     return {"status": "ok"}
+
+
+# Serve UI static files
+ui_dist_path = Path(__file__).parent.parent / "ui" / "dist"
+if ui_dist_path.exists():
+    app.mount("/ui/assets", StaticFiles(directory=str(ui_dist_path / "assets")), name="ui-assets")
+    
+    @app.get("/ui/{full_path:path}")
+    async def serve_ui(full_path: str):
+        """Serve the React SPA - all routes return index.html for client-side routing"""
+        index_path = ui_dist_path / "index.html"
+        if index_path.exists():
+            return FileResponse(str(index_path))
+        return {"error": "UI not built. Run 'cd ui && npm run build'"}
