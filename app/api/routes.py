@@ -33,7 +33,7 @@ async def list_tenants(db: Session = Depends(get_db)):
 
 
 @router.get("/tenants/{tenant_id}", tags=["tenants"], response_model=TenantOut)
-async def get_tenant(tenant_id: str, db: Session = Depends(get_db)):
+async def get_tenant_by_id(tenant_id: str, db: Session = Depends(get_db)):
     return services.get_tenant(db, tenant_id)
 
 

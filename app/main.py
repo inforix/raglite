@@ -1,6 +1,7 @@
 import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 
 from app.api import api_router
 from app.config import get_settings
@@ -20,6 +21,37 @@ app = FastAPI(
     redoc_url=settings.redoc_url,
     openapi_url=settings.openapi_url,
 )
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+    openapi_schema = get_openapi(
+        title=settings.app_name,
+        version=settings.api_version,
+        openapi_version=settings.openapi_version,
+        description="RAGLite API - Multi-tenant RAG pipeline with ingestion, embedding, and retrieval",
+        routes=app.routes,
+    )
+    openapi_schema["components"]["securitySchemes"] = {
+        "BearerAuth": {
+            "type": "http",
+            "scheme": "bearer",
+            "description": "Enter your API key obtained from POST /v1/tenants"
+        }
+    }
+    # Apply security to all protected endpoints
+    for path, path_item in openapi_schema["paths"].items():
+        if path == "/health":
+            continue
+        if path == "/v1/tenants" and "post" in path_item:
+            continue  # Creating tenant doesn't require auth
+        for method in path_item:
+            if method in ["get", "post", "put", "delete", "patch"]:
+                path_item[method]["security"] = [{"BearerAuth": []}]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+app.openapi = custom_openapi
 
 app.include_router(api_router)
 

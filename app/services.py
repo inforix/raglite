@@ -118,8 +118,13 @@ def get_tenant(db: Session, tenant_id: str) -> TenantOut:
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
-    # Mask API key since we only store the hash
-    return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key="***", created_at=tenant.created_at)
+    # We only store hashed API keys, cannot retrieve the original
+    return TenantOut(
+        id=tenant.id, 
+        name=tenant.name, 
+        description=tenant.description, 
+        api_key="<hidden - only shown at creation>"
+    )
 
 
 def update_tenant(db: Session, tenant_id: str, payload: TenantCreate) -> TenantOut:
