@@ -1,7 +1,7 @@
 import uuid
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy.orm import Session
 import requests
 
@@ -9,18 +9,53 @@ from app import services
 from app.config import get_settings
 from app.dedup import find_duplicate_document
 from app.deps import TenantContext, get_tenant
-from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse, DocumentOut, DocumentUpdate, DocumentListResponse
+from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse, DocumentOut, DocumentUpdate, DocumentListResponse, SettingsOut, SettingsUpdate
 from app.schemas_tenant import TenantCreate, TenantOut
 from app.schemas_auth import LoginRequest, LoginResponse, UserOut
+from app.auth import get_current_user as get_current_user_dep
 from core import embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
 from infra import models
+from infra.models import User
 from infra.db import get_db
+from app.settings_service import get_app_settings_db, update_app_settings_db
 
 router = APIRouter()
 settings = get_settings()
 vs = vectorstore.get_vector_store()
 bm25_client = opensearch_bm25.get_bm25_client()
+
+
+@router.get("/settings", tags=["settings"], response_model=SettingsOut)
+async def get_settings_endpoint(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_dep)) -> SettingsOut:
+    app_settings = get_app_settings_db(db)
+    return SettingsOut(
+        default_embedder=app_settings.default_embedder,
+        allowed_embedders=settings.allowed_embedders,
+        default_chat_model=app_settings.default_chat_model,
+        allowed_chat_models=settings.allowed_chat_models,
+    )
+
+
+@router.put("/settings", tags=["settings"], response_model=SettingsOut)
+async def update_settings_endpoint(
+    payload: SettingsUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+) -> SettingsOut:
+    if payload.default_embedder:
+        if payload.default_embedder not in settings.allowed_embedders:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
+    if payload.default_chat_model:
+        if payload.default_chat_model not in settings.allowed_chat_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
+    updated = update_app_settings_db(db, payload.default_embedder, payload.default_chat_model)
+    return SettingsOut(
+        default_embedder=updated.default_embedder,
+        allowed_embedders=settings.allowed_embedders,
+        default_chat_model=updated.default_chat_model,
+        allowed_chat_models=settings.allowed_chat_models,
+    )
 
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED, tags=["tenants"], response_model=TenantOut)
@@ -140,6 +175,32 @@ async def upload_documents(
     docs = services.record_documents(db, tenant.tenant_id, dataset_id, uploads)
     job_resp = services.create_document_jobs(db, tenant.tenant_id, dataset_id, docs, dataset.embedder)
     return job_resp
+
+
+@router.post("/documents/upload", status_code=status.HTTP_202_ACCEPTED, tags=["documents"], response_model=DocumentUploadResponse)
+async def upload_documents_form(
+    dataset_id: str = Form(...),
+    file: Optional[UploadFile] = File(default=None),
+    files: Optional[List[UploadFile]] = File(default=None),
+    source_uri: Optional[str] = Form(default=None),
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> DocumentUploadResponse:
+    """
+    Convenience alias for uploads from form-data (UI uses 'file'); forwards to /v1/documents handler.
+    """
+    incoming_files: List[UploadFile] = []
+    if file:
+        incoming_files.append(file)
+    if files:
+        incoming_files.extend(files)
+    return await upload_documents(
+        dataset_id=dataset_id,
+        files=incoming_files or None,
+        source_uri=source_uri,
+        tenant=tenant,
+        db=db,
+    )
 
 
 @router.get("/documents", tags=["documents"], response_model=DocumentListResponse)
@@ -268,31 +329,43 @@ async def reindex(dataset_id: str, embedder: Optional[str] = None, tenant: Tenan
 
 # Authentication endpoints
 @router.post("/auth/login", tags=["auth"], response_model=LoginResponse)
-async def login(payload: LoginRequest):
-    """
-    Mock login endpoint for demo purposes.
-    In production, implement proper authentication with password hashing and JWT tokens.
-    """
-    # For demo: accept any email/password
-    user = UserOut(
-        id=str(uuid.uuid4()),
-        email=payload.email,
-        name="Admin User"
+async def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    """Login endpoint with JWT authentication."""
+    from app.auth import authenticate_user, create_access_token
+    
+    user = authenticate_user(db, payload.email, payload.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect email or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    
+    # Create access token
+    access_token = create_access_token(data={"sub": user.id})
+    
+    return LoginResponse(
+        access_token=access_token,
+        token_type="bearer",
+        user=UserOut(
+            id=user.id,
+            email=user.email,
+            name=user.name,
+            is_active=user.is_active,
+            is_superuser=user.is_superuser
+        )
     )
-    return LoginResponse(user=user)
 
 
 @router.get("/auth/me", tags=["auth"], response_model=UserOut)
-async def get_current_user():
-    """
-    Get current user info.
-    In production, this should validate the JWT token and return the actual user.
-    """
-    # For demo: return a mock user
+async def get_current_user(current_user: User = Depends(get_current_user_dep)):
+    """Get current user info from JWT token."""
     return UserOut(
-        id=str(uuid.uuid4()),
-        email="admin@example.com",
-        name="Admin User"
+        id=current_user.id,
+        email=current_user.email,
+        name=current_user.name,
+        is_active=current_user.is_active,
+        is_superuser=current_user.is_superuser
     )
 
 
@@ -303,4 +376,3 @@ async def logout():
     In production, this should invalidate the JWT token.
     """
     return {"status": "ok", "message": "Logged out successfully"}
-

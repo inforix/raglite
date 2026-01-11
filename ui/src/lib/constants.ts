@@ -22,6 +22,9 @@ export const API_ENDPOINTS = {
   QUERY: '/v1/query',
   QUERY_STREAM: '/v1/query/stream',
   QUERY_HISTORY: '/v1/query/history',
+
+  // Settings
+  SETTINGS: '/v1/settings',
 };
 
 export const QUERY_KEYS = {

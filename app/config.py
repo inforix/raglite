@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     allowed_embedders: List[str] = Field(
         default_factory=lambda: ["sentence-transformers/all-MiniLM-L6-v2"]
     )
+    default_chat_model: str = "gpt-4o-mini"
+    allowed_chat_models: List[str] = Field(default_factory=lambda: ["gpt-4o-mini", "gpt-3.5-turbo"])
 
     # Ingestion limits
     max_files_per_upload: int = 10

@@ -95,3 +95,15 @@ class QueryResponse(BaseModel):
     query: str
     rewritten: Optional[str] = None
     results: List[QueryHit] = Field(default_factory=list)
+
+
+class SettingsOut(BaseModel):
+    default_embedder: str
+    allowed_embedders: List[str]
+    default_chat_model: str
+    allowed_chat_models: List[str]
+
+
+class SettingsUpdate(BaseModel):
+    default_embedder: Optional[str] = None
+    default_chat_model: Optional[str] = None

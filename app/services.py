@@ -8,6 +8,7 @@ from passlib.hash import pbkdf2_sha256
 
 from app.config import get_settings
 from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse
+from app.settings_service import get_app_settings_db
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import storage, vectorstore
 from infra import models
@@ -18,7 +19,8 @@ vs = vectorstore.get_vector_store()
 
 
 def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> DatasetOut:
-    embedder = payload.embedder or settings.default_embedder
+    app_settings = get_app_settings_db(db)
+    embedder = payload.embedder or app_settings.default_embedder
     if embedder not in settings.allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
     ds = models.Dataset(
@@ -75,6 +77,7 @@ def get_dataset(db: Session, tenant_id: str, dataset_id: str) -> DatasetOut:
 
 def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: DatasetUpdate) -> DatasetOut:
     """Update a dataset."""
+    app_settings = get_app_settings_db(db)
     ds = (
         db.query(models.Dataset)
         .filter(
@@ -96,6 +99,8 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
         if payload.embedder not in settings.allowed_embedders:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
         ds.embedder = payload.embedder
+    elif not ds.embedder:
+        ds.embedder = app_settings.default_embedder
     
     db.commit()
     db.refresh(ds)

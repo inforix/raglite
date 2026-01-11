@@ -1,0 +1,133 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: raglite-postgres
+    environment:
+      POSTGRES_DB: raglite
+      POSTGRES_USER: raglite
+      POSTGRES_PASSWORD: raglite
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U raglite"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: raglite-qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: raglite-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    image: opensearchproject/opensearch:2
+    container_name: raglite-opensearch
+    environment:
+      - discovery.type=single-node
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Admin@123
+      - "DISABLE_SECURITY_PLUGIN=true"
+      - "bootstrap.memory_lock=true"
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raglite-api
+    ports:
+      - "7615:7615"
+    env_file:
+      - .env
+    environment:
+      - RAGLITE_POSTGRES_DSN=${RAGLITE_POSTGRES_DSN:-postgresql://raglite:raglite@postgres:5432/raglite}
+      - RAGLITE_QDRANT_URL=${RAGLITE_QDRANT_URL:-http://qdrant:6333}
+      - RAGLITE_REDIS_URL=${RAGLITE_REDIS_URL:-redis://redis:6379/0}
+      - RAGLITE_OPENSEARCH_URL=${RAGLITE_OPENSEARCH_URL:-http://opensearch:9200}
+      - RAGLITE_OPENSEARCH_VERIFY_CERTS=${RAGLITE_OPENSEARCH_VERIFY_CERTS:-false}
+      - RAGLITE_ENVIRONMENT=${RAGLITE_ENVIRONMENT:-dev}
+      - RAGLITE_LOG_LEVEL=${RAGLITE_LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+      - ./ui/dist:/app/ui/dist
+
+  worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: raglite-worker
+    command: uv run celery -A workers.worker.celery_app worker --loglevel=info
+    env_file:
+      - .env
+    environment:
+      - RAGLITE_POSTGRES_DSN=${RAGLITE_POSTGRES_DSN:-postgresql://raglite:raglite@postgres:5432/raglite}
+      - RAGLITE_QDRANT_URL=${RAGLITE_QDRANT_URL:-http://qdrant:6333}
+      - RAGLITE_REDIS_URL=${RAGLITE_REDIS_URL:-redis://redis:6379/0}
+      - RAGLITE_OPENSEARCH_URL=${RAGLITE_OPENSEARCH_URL:-http://opensearch:9200}
+      - RAGLITE_OPENSEARCH_VERIFY_CERTS=${RAGLITE_OPENSEARCH_VERIFY_CERTS:-false}
+      - RAGLITE_ENVIRONMENT=${RAGLITE_ENVIRONMENT:-dev}
+      - RAGLITE_LOG_LEVEL=${RAGLITE_LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_started
+    volumes:
+      - ./data:/app/data
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  redis_data:
+  opensearch_data:
