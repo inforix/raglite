@@ -6,6 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTenants } from '@/hooks/useTenants';
 import { useDatasets } from '@/hooks/useDatasets';
 import { Label } from '@/components/ui/label';
+import { api } from '@/lib/api';
+import { API_ENDPOINTS } from '@/lib/constants';
 
 interface Message {
   role: 'user' | 'assistant';
@@ -34,6 +36,13 @@ export function QueryChat() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim() || isLoading) return;
+    if (!selectedDatasetId) {
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: 'Please select a dataset to query.' },
+      ]);
+      return;
+    }
 
     const userMessage: Message = { role: 'user', content: input };
     setMessages((prev) => [...prev, userMessage]);
@@ -41,20 +50,48 @@ export function QueryChat() {
     setIsLoading(true);
 
     try {
-      // TODO: Implement streaming query
-      // For now, just add a mock response
-      setTimeout(() => {
-        const assistantMessage: Message = {
-          role: 'assistant',
-          content: 'This is a placeholder response. The streaming query endpoint will be implemented on the backend.',
-        };
-        setMessages((prev) => [...prev, assistantMessage]);
-        setIsLoading(false);
-      }, 1000);
-    } catch (error) {
+      const payload = {
+        query: userMessage.content,
+        dataset_ids: [selectedDatasetId],
+        k: 5,
+        rewrite: true,
+      };
+      const response = await api.post(API_ENDPOINTS.QUERY, payload);
+      const data = response.data as {
+        query: string;
+        rewritten?: string;
+        results: Array<{
+          text: string;
+          score: number;
+          dataset_id: string;
+          document_id: string;
+        }>;
+      };
+
+      const lines =
+        data.results && data.results.length > 0
+          ? data.results.slice(0, 3).map((r, idx) => {
+              const label = data.rewritten && idx === 0 ? '(rewritten)' : '';
+              return `• ${r.text.trim()}\n  score: ${r.score.toFixed(3)} | dataset: ${r.dataset_id} | doc: ${r.document_id} ${label}`;
+            })
+          : ['No results found.'];
+
+      const assistantMessage: Message = {
+        role: 'assistant',
+        content: lines.join('\n'),
+      };
+      setMessages((prev) => [...prev, assistantMessage]);
+    } catch (error: any) {
       console.error('Query error:', error);
+      const detail = error?.response?.data?.detail;
+      setMessages((prev) => [
+        ...prev,
+        { role: 'assistant', content: `Query failed${detail ? `: ${detail}` : ''}` },
+      ]);
       setIsLoading(false);
+      return;
     }
+    setIsLoading(false);
   };
 
   return (
@@ -94,7 +131,7 @@ export function QueryChat() {
             onChange={(e) => setSelectedDatasetId(e.target.value)}
             disabled={!selectedTenantId}
           >
-            <option value="">Select dataset (optional)</option>
+            <option value="">Select dataset</option>
             {datasets?.map((dataset) => (
               <option key={dataset.id} value={dataset.id}>
                 {dataset.name}
