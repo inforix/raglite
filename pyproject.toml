@@ -3,7 +3,7 @@ name = "raglite"
 version = "0.1.0"
 description = "Spec-driven RAGLite API + worker"
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.11,<3.12"
 dependencies = [
     "fastapi",
     "uvicorn",
@@ -17,6 +17,7 @@ dependencies = [
     "sentence-transformers",
     "beautifulsoup4",
     "passlib[bcrypt]",
+    "python-jose[cryptography]",
     "python-docx",
     "markdown",
     "rank-bm25",
@@ -24,6 +25,8 @@ dependencies = [
     "requests",
     "langdetect",
     "python-multipart",
+    "email-validator",
+    "torch==2.1.2",
 ]
 
 [project.optional-dependencies]

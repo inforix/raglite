@@ -2,10 +2,12 @@ import time
 from dataclasses import dataclass
 from typing import Dict, Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
+from sqlalchemy.orm import Session
 
+from app.auth import decode_access_token
 from app.config import get_settings
-from infra.db import SessionLocal
+from infra.db import SessionLocal, get_db
 from infra import models
 from passlib.hash import pbkdf2_sha256
 
@@ -26,8 +28,11 @@ def register_api_key(api_key: str, tenant_id: str):
     _API_KEYS[api_key] = tenant_id
 
 
-def _lookup_api_key_db(api_key: str) -> Optional[str]:
-    db = SessionLocal()
+def _lookup_api_key_db(api_key: str, db: Session | None = None) -> Optional[str]:
+    owns_session = False
+    if db is None:
+        db = SessionLocal()
+        owns_session = True
     try:
         key_rows = db.query(models.ApiKey).filter(models.ApiKey.active.is_(True)).all()
         for k in key_rows:
@@ -35,7 +40,8 @@ def _lookup_api_key_db(api_key: str) -> Optional[str]:
                 return k.tenant_id
         return None
     finally:
-        db.close()
+        if owns_session:
+            db.close()
 
 
 def _rate_limit(tenant_id: str):
@@ -51,19 +57,70 @@ def _rate_limit(tenant_id: str):
     bucket.append(now)
 
 
-def get_tenant(authorization: Optional[str] = Header(None, convert_underscores=False)) -> TenantContext:
+def get_tenant(
+    authorization: Optional[str] = Header(None, convert_underscores=False),
+    x_tenant_id: Optional[str] = Header(None, convert_underscores=False),
+    tenant_id: Optional[str] = None,
+    dataset_id: Optional[str] = None,
+    db: Session = Depends(get_db),
+) -> TenantContext:
     """
-    Auth expects Bearer <api_key>; validates against DB or in-memory map and applies rate limiting.
+    Resolve tenant context from either an API key or a JWT bearer token.
+    - API key: Authorization: Bearer <api_key> (or raw value)
+    - JWT: Authorization: Bearer <jwt>; requires tenant_id in query/header or falls back to bootstrap tenant.
     """
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Authorization header")
+
+    requested_tenant = x_tenant_id or tenant_id
+    if not requested_tenant and dataset_id:
+        ds = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
+        if ds:
+            requested_tenant = ds.tenant_id
+    if not requested_tenant:
+        first_tenant = db.query(models.Tenant).order_by(models.Tenant.created_at).first()
+        if first_tenant:
+            requested_tenant = first_tenant.id
+        elif settings.bootstrap_tenant_id:
+            requested_tenant = settings.bootstrap_tenant_id
+
+    bearer_value: Optional[str] = None
+    api_key: Optional[str] = None
     parts = authorization.split()
     if len(parts) == 2 and parts[0].lower() == "bearer":
-        api_key = parts[1]
+        bearer_value = parts[1]
     else:
         api_key = authorization
-    tenant_id = _lookup_api_key_db(api_key) or _API_KEYS.get(api_key)
-    if not tenant_id:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
-    _rate_limit(tenant_id)
-    return TenantContext(tenant_id=tenant_id, api_key=api_key)
+
+    # Try JWT first; if invalid, fall back to API key handling
+    if bearer_value:
+        try:
+            payload = decode_access_token(bearer_value)
+            user_id = payload.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+            user = (
+                db.query(models.User)
+                .filter(models.User.id == user_id, models.User.is_active.is_(True))
+                .first()
+            )
+            if not user:
+                raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
+            tenant_val = requested_tenant or settings.bootstrap_tenant_id
+            if not tenant_val:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="tenant_id is required for this request",
+                )
+            return TenantContext(tenant_id=tenant_val, api_key="")
+        except HTTPException:
+            api_key = bearer_value
+
+    if api_key:
+        tenant_from_key = _lookup_api_key_db(api_key, db=db) or _API_KEYS.get(api_key)
+        if not tenant_from_key:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid API key")
+        _rate_limit(tenant_from_key)
+        return TenantContext(tenant_id=tenant_from_key, api_key=api_key)
+
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Authorization header")

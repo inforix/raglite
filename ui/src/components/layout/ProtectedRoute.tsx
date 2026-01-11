@@ -5,23 +5,28 @@ import { api } from '@/lib/api';
 import { API_ENDPOINTS } from '@/lib/constants';
 
 export function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, isLoading, setUser } = useAuthStore();
+  const { isAuthenticated, isLoading, token, setAuth, setLoading } = useAuthStore();
   const location = useLocation();
 
   useEffect(() => {
     const checkAuth = async () => {
+      if (!token) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const response = await api.get(API_ENDPOINTS.ME);
-        setUser(response.data);
+        setAuth(response.data, token);
       } catch (error) {
-        setUser(null);
+        setAuth(null, null);
       }
     };
 
     if (isLoading) {
       checkAuth();
     }
-  }, [isLoading, setUser]);
+  }, [isLoading, token, setAuth, setLoading]);
 
   if (isLoading) {
     return (

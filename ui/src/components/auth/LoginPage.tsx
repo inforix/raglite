@@ -21,7 +21,7 @@ type LoginFormData = z.infer<typeof loginSchema>;
 export function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { setUser } = useAuthStore();
+  const { setAuth } = useAuthStore();
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -39,12 +39,13 @@ export function LoginPage() {
 
     try {
       const response = await api.post(API_ENDPOINTS.LOGIN, data);
-      setUser(response.data.user);
+      const { user, access_token } = response.data;
+      setAuth(user, access_token);
       
       const from = (location.state as any)?.from?.pathname || '/ui';
       navigate(from, { replace: true });
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      setError(err.response?.data?.detail || 'Login failed. Please check your credentials.');
     } finally {
       setIsLoading(false);
     }

@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project specific
+raglite.db
+raglite.db-*
+data/
+*.log
+.env
+
+# UI build artifacts
+ui/node_modules/
+ui/dist/
+ui/.vite/
+
+# Git
+.git/
+.gitignore

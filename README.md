@@ -1,6 +1,97 @@
 # RAGLite
 
-Spec-driven, API-only RAG pipeline inspired by RAGFlow. Supports multi-tenant isolation, ingestion + embedding, vector storage, query rewriting, and retrieval without a web UI.
+Spec-driven RAG pipeline with multi-tenant support, featuring a modern React admin UI and comprehensive REST API.
+
+## Admin UI Quick Start
+
+The fastest way to get started with the admin interface:
+
+```bash
+# 1. Run the automated setup (migrations + create admin user)
+./scripts/setup_auth.sh
+
+# 2. Start the server
+uv run uvicorn app.main:app --host 0.0.0.0 --port 7615
+
+# 3. Open your browser
+# http://localhost:7615/ui/login
+```
+
+**Default Login Credentials:**
+- Email: `admin@raglite.local`
+- Password: `admin123`
+
+⚠️ **Security**: Change the default password for production!
+
+For custom admin users:
+```bash
+uv run python scripts/create_admin_standalone.py your@email.com yourpassword "Your Name"
+```
+
+## Quick Start with Docker Compose
+
+The easiest way to get started - everything runs in Docker:
+
+```bash
+# Clone the repository
+git clone https://github.com/inforix/raglite.git
+cd raglite
+
+# Build the UI (first time only)
+cd ui && npm install && npm run build && cd ..
+
+# Start all services (Postgres, Qdrant, Redis, OpenSearch, API, Worker)
+docker compose up -d
+
+# Check service status
+docker compose ps
+
+# View logs
+docker compose logs -f api
+```
+
+Access the application:
+- **Admin UI**: http://localhost:7615/ui
+- **API Documentation**: http://localhost:7615/
+- **Health Check**: http://localhost:7615/health
+
+Stop all services:
+```bash
+docker compose down
+```
+
+Remove all data volumes:
+```bash
+docker compose down -v
+```
+
+## Development Setup (Local)
+
+If you want to run the API locally without Docker:
+
+```bash
+# Start only the infrastructure services (optional - uses SQLite by default)
+docker compose up -d postgres qdrant redis opensearch
+
+# Install Python dependencies
+uv sync
+
+# Copy environment template
+cp .env.example .env
+
+# Run the setup script (migrations + admin user)
+./scripts/setup_auth.sh
+
+# OR manually:
+# uv run python scripts/run_migrations.py
+# uv run python scripts/create_admin_standalone.py
+
+# Start the API server
+uv run uvicorn app.main:app --host 0.0.0.0 --port 7615 --reload
+
+# In another terminal, start the worker
+uv run celery -A workers.worker.celery_app worker --loglevel=info
+```
 
 ## Goals
 - Simple deploy: one API service + worker + vector DB.

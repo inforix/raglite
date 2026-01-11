@@ -13,6 +13,8 @@ class UserCreate(UserBase):
 
 class UserOut(UserBase):
     id: str
+    is_active: bool = True
+    is_superuser: bool = False
 
     class Config:
         from_attributes = True
@@ -24,5 +26,6 @@ class LoginRequest(BaseModel):
 
 
 class LoginResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
     user: UserOut
-    token: Optional[str] = None
