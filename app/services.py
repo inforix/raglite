@@ -20,23 +20,25 @@ vs = vectorstore.get_vector_store()
 
 
 def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> DatasetOut:
-    app_settings = get_app_settings_db(db)
-    embedder = payload.embedder or app_settings.default_embedder
+    embedder_name = (payload.embedder or "").strip()
+    if not embedder_name:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder is required")
     allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
-    if embedder not in allowed_embedders:
+    if embedder_name not in allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
     ds = models.Dataset(
         id=str(uuid.uuid4()),
         tenant_id=tenant_id,
         name=payload.name,
         description=payload.description,
-        embedder=embedder,
+        embedder=embedder_name,
     )
     db.add(ds)
     db.commit()
     db.refresh(ds)
     return DatasetOut(
         id=ds.id,
+        tenant_id=ds.tenant_id,
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
@@ -48,6 +50,7 @@ def list_datasets(db: Session, tenant_id: str) -> List[DatasetOut]:
     return [
         DatasetOut(
             id=r.id,
+            tenant_id=r.tenant_id,
             name=r.name,
             description=r.description,
             embedder=r.embedder,
@@ -71,6 +74,7 @@ def get_dataset(db: Session, tenant_id: str, dataset_id: str) -> DatasetOut:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
     return DatasetOut(
         id=ds.id,
+        tenant_id=ds.tenant_id,
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
@@ -91,6 +95,7 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
     )
     if not ds:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    embedder_changed = False
     
     # Update only provided fields
     if payload.name is not None:
@@ -101,14 +106,25 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
         allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
         if payload.embedder not in allowed_embedders:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
-        ds.embedder = payload.embedder
+        if payload.embedder != ds.embedder:
+            if not payload.confirm_embedder_change:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Changing embedder will re-embed all documents. Set confirm_embedder_change=true to proceed.",
+                )
+            ds.embedder = payload.embedder
+            embedder_changed = True
     elif not ds.embedder:
         ds.embedder = app_settings.default_embedder
     
     db.commit()
     db.refresh(ds)
+    if embedder_changed:
+        job_id = create_reindex_job(db, tenant_id, dataset_id, ds.embedder)
+        enqueue_reindex_job(job_id, tenant_id, dataset_id, ds.embedder)
     return DatasetOut(
         id=ds.id,
+        tenant_id=ds.tenant_id,
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,

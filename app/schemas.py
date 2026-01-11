@@ -18,18 +18,20 @@ class TenantOut(BaseModel):
 class DatasetCreate(BaseModel):
     name: str
     description: Optional[str] = None
-    embedder: Optional[str] = None
+    embedder: str
 
 
 class DatasetUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     embedder: Optional[str] = None
+    confirm_embedder_change: bool = False
 
 
 class DatasetOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: str
+    tenant_id: str
     name: str
     description: Optional[str] = None
     embedder: Optional[str] = None

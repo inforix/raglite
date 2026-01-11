@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label';
 export function DatasetsList() {
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const { data: tenants } = useTenants();
-  const { data: datasets, isLoading, error } = useDatasets(selectedTenantId || undefined);
+  const { data: datasets, isLoading, error, refetch } = useDatasets(selectedTenantId || undefined);
   const deleteDataset = useDeleteDataset();
   const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -88,8 +88,11 @@ export function DatasetsList() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle>All Datasets</CardTitle>
+          <Button variant="ghost" size="icon" onClick={() => refetch?.()}>
+            <RotateCw className="h-4 w-4" />
+          </Button>
         </CardHeader>
         <CardContent>
           {isLoading ? (
