@@ -89,7 +89,7 @@ class OpenSearchBM25:
             res = self.client.search(
                 index=idx,
                 size=k,
-                query={"multi_match": {"query": query, "fields": ["text"]}},
+                body={"query": {"multi_match": {"query": query, "fields": ["text"]}}},
             )
             for hit in res.get("hits", {}).get("hits", []):
                 source = hit.get("_source", {})

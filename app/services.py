@@ -42,6 +42,7 @@ def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> Datas
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        created_at=ds.created_at,
     )
 
 
@@ -54,6 +55,7 @@ def list_datasets(db: Session, tenant_id: str) -> List[DatasetOut]:
             name=r.name,
             description=r.description,
             embedder=r.embedder,
+            created_at=r.created_at,
         )
         for r in rows
     ]
@@ -78,6 +80,7 @@ def get_dataset(db: Session, tenant_id: str, dataset_id: str) -> DatasetOut:
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        created_at=ds.created_at,
     )
 
 
@@ -128,6 +131,7 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        created_at=ds.created_at,
     )
 
 

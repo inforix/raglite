@@ -35,6 +35,7 @@ class DatasetOut(BaseModel):
     name: str
     description: Optional[str] = None
     embedder: Optional[str] = None
+    created_at: datetime
 
 
 class DocumentUploadResponse(BaseModel):

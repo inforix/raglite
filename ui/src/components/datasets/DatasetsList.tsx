@@ -8,6 +8,7 @@ import { useTenants } from '@/hooks/useTenants';
 import { DatasetDialog } from './DatasetDialog';
 import { Dataset } from '@/types/dataset';
 import { Label } from '@/components/ui/label';
+import { useMemo } from 'react';
 
 export function DatasetsList() {
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
@@ -16,6 +17,13 @@ export function DatasetsList() {
   const deleteDataset = useDeleteDataset();
   const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const tenantNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    tenants?.forEach((t) => {
+      map[t.id] = t.name;
+    });
+    return map;
+  }, [tenants]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this dataset?')) {
@@ -105,7 +113,8 @@ export function DatasetsList() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Tenant ID</TableHead>
+                  <TableHead>Dataset ID</TableHead>
+                  <TableHead>Tenant</TableHead>
                   <TableHead>Language</TableHead>
                   <TableHead>Created</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
@@ -116,7 +125,10 @@ export function DatasetsList() {
                   <TableRow key={dataset.id}>
                     <TableCell className="font-medium">{dataset.name}</TableCell>
                     <TableCell className="font-mono text-sm text-muted-foreground">
-                      {dataset.tenant_id?.substring(0, 8)}...
+                      {dataset.id}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {tenantNameMap[dataset.tenant_id] || dataset.tenant_id || '-'}
                     </TableCell>
                     <TableCell>{dataset.language || 'en'}</TableCell>
                     <TableCell>

@@ -371,13 +371,15 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
     results = []
     for hit in results_raw:
         payload = hit.get("payload", {})
+        doc_id = payload.get("document_id") or ""
+        ds_id = payload.get("dataset_id") or ""
         results.append(
             {
-                "chunk_id": hit.get("id", ""),
-                "document_id": payload.get("document_id", ""),
-                "dataset_id": payload.get("dataset_id", ""),
+                "chunk_id": hit.get("id", "") or "",
+                "document_id": doc_id,
+                "dataset_id": ds_id,
                 "score": hit.get("score", 0.0),
-                "text": payload.get("text", ""),
+                "text": payload.get("text", "") or "",
                 "source_uri": payload.get("source_uri"),
                 "meta": payload.get("meta"),
             }
@@ -386,17 +388,19 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
     for r in results:
         merged[r["chunk_id"]] = r
     for hit in bm25_hits:
-        cid = hit.get("id", "")
+        cid = hit.get("id", "") or ""
         payload = hit.get("payload", {})
+        doc_id = payload.get("document_id") or ""
+        ds_id = payload.get("dataset_id") or ""
         if cid in merged:
             merged[cid]["score"] += hit.get("score", 0.0)
         else:
             merged[cid] = {
                 "chunk_id": cid,
-                "document_id": payload.get("document_id", ""),
-                "dataset_id": payload.get("dataset_id", ""),
+                "document_id": doc_id,
+                "dataset_id": ds_id,
                 "score": hit.get("score", 0.0),
-                "text": payload.get("text", ""),
+                "text": payload.get("text", "") or "",
                 "source_uri": payload.get("source_uri"),
                 "meta": payload.get("meta"),
             }
