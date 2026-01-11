@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { Trash2, Upload, FileText } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import type { DragEvent } from 'react';
+import { Trash2, Upload, FileText, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,15 +9,25 @@ import { useDatasets } from '@/hooks/useDatasets';
 import { useTenants } from '@/hooks/useTenants';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 
 export function DocumentsList() {
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   
   const { data: tenants } = useTenants();
   const { data: datasets } = useDatasets(selectedTenantId || undefined);
-  const { data: documents, isLoading } = useDocuments(selectedDatasetId || undefined);
+  const { data: documents, isLoading, isFetching, refetch } = useDocuments(selectedDatasetId || undefined);
   const deleteDocument = useDeleteDocument();
   const uploadDocument = useUploadDocument();
 
@@ -40,9 +51,18 @@ export function DocumentsList() {
       }
     }
     setUploadFiles(null);
+    setIsUploadOpen(false);
   };
 
-  const formatFileSize = (bytes?: number) => {
+  const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    setIsDragging(false);
+    if (event.dataTransfer.files && event.dataTransfer.files.length > 0) {
+      setUploadFiles(event.dataTransfer.files);
+    }
+  }, []);
+
+  const formatFileSize = (bytes?: number | null) => {
     if (!bytes) return '-';
     const kb = bytes / 1024;
     if (kb < 1024) return `${kb.toFixed(1)} KB`;
@@ -105,45 +125,30 @@ export function DocumentsList() {
         </CardContent>
       </Card>
 
-      {selectedDatasetId && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Upload Documents</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="border-2 border-dashed rounded-lg p-8 text-center">
-                <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-                <Input
-                  type="file"
-                  multiple
-                  onChange={(e) => setUploadFiles(e.target.files)}
-                  className="max-w-md mx-auto"
-                />
-                <p className="text-sm text-muted-foreground mt-2">
-                  Supports PDF, TXT, DOCX, and more
-                </p>
-              </div>
-              
-              {uploadFiles && uploadFiles.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">
-                    {uploadFiles.length} file(s) selected
-                  </p>
-                  <Button onClick={handleUpload} disabled={uploadDocument.isPending}>
-                    <Upload className="h-4 w-4 mr-2" />
-                    {uploadDocument.isPending ? 'Uploading...' : 'Upload'}
-                  </Button>
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
       <Card>
         <CardHeader>
-          <CardTitle>Documents</CardTitle>
+          <div className="flex items-center justify-between gap-2">
+            <CardTitle>Documents</CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => refetch()}
+                disabled={!selectedDatasetId || isLoading || isFetching}
+                title="Refresh"
+              >
+                <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
+              </Button>
+              <Button
+                onClick={() => setIsUploadOpen(true)}
+                disabled={!selectedDatasetId}
+                variant="outline"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {!selectedDatasetId ? (
@@ -162,7 +167,7 @@ export function DocumentsList() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Title</TableHead>
+                  <TableHead>Filename</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Size</TableHead>
                   <TableHead>Status</TableHead>
@@ -173,19 +178,19 @@ export function DocumentsList() {
               <TableBody>
                 {documents.map((doc) => (
                   <TableRow key={doc.id}>
-                    <TableCell className="font-medium">{doc.title}</TableCell>
+                    <TableCell className="font-medium">{doc.filename || doc.id}</TableCell>
                     <TableCell className="uppercase text-sm">
-                      {doc.file_type || '-'}
+                      {doc.mime_type || '-'}
                     </TableCell>
-                    <TableCell>{formatFileSize(doc.file_size)}</TableCell>
+                    <TableCell>{formatFileSize(doc.size_bytes)}</TableCell>
                     <TableCell>
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs ${
                           doc.status === 'completed'
                             ? 'bg-green-100 text-green-800'
-                            : doc.status === 'processing'
+                          : doc.status === 'processing'
                             ? 'bg-blue-100 text-blue-800'
-                            : doc.status === 'failed'
+                          : doc.status === 'failed'
                             ? 'bg-red-100 text-red-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
@@ -221,6 +226,54 @@ export function DocumentsList() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Upload documents</DialogTitle>
+            <DialogDescription>
+              Choose files or drag and drop them below to upload to the selected dataset.
+            </DialogDescription>
+          </DialogHeader>
+          <div
+            className={`border-2 border-dashed rounded-lg p-6 text-center transition ${
+              isDragging ? 'border-primary bg-primary/5' : 'border-muted'
+            }`}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragging(true);
+            }}
+            onDragLeave={() => setIsDragging(false)}
+            onDrop={handleDrop}
+          >
+            <Upload className="h-10 w-10 mx-auto text-muted-foreground mb-3" />
+            <p className="text-sm text-muted-foreground">
+              Drag files here or click below to browse
+            </p>
+            <Input
+              type="file"
+              multiple
+              onChange={(e) => setUploadFiles(e.target.files)}
+              className="mt-4 w-full cursor-pointer"
+            />
+          </div>
+
+          {uploadFiles && uploadFiles.length > 0 && (
+            <div className="text-sm text-muted-foreground">
+              {uploadFiles.length} file(s) selected
+            </div>
+          )}
+
+          <DialogFooter className="mt-2">
+            <Button
+              onClick={handleUpload}
+              disabled={!uploadFiles || uploadFiles.length === 0 || uploadDocument.isPending || !selectedDatasetId}
+            >
+              {uploadDocument.isPending ? 'Uploading...' : 'Start upload'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

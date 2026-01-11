@@ -234,7 +234,7 @@ def create_document_jobs(db: Session, tenant_id: str, dataset_id: str, docs: Lis
             tenant_id=tenant_id,
             type=models.JobType.ingest.value,
             status=models.JobStatus.pending.value,
-            payload={"document_id": doc.id, "embedder": embedder},
+            payload={"document_id": doc.id, "dataset_id": dataset_id, "embedder": embedder},
         )
         db.add(job)
         job_ids.append(job.id)

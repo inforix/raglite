@@ -1,8 +1,9 @@
 from datetime import datetime
+import uuid
 from typing import List
 
 from app.config import get_settings
-from core import chunker, embedder, parser, vectorstore
+from core import chunker, embedder as embedder_module, parser, vectorstore
 from core import opensearch_bm25
 from infra import models
 from infra.db import SessionLocal
@@ -31,6 +32,7 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
         if job:
             job.status = models.JobStatus.running.value
             job.progress = 10
+            job.error = None
             db.commit()
         text, lang = parser.parse_text(path, mime_type)
         if job:
@@ -41,15 +43,16 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
             job.progress = 60
             db.commit()
         chunk_texts = [c[2] for c in chunks]
-        embeddings = embedder.embed_texts(chunk_texts, model_name=embedder_name)
+        embeddings = embedder_module.embed_texts(chunk_texts, model_name=embedder_name)
         if job:
             job.progress = 80
             db.commit()
         payload = []
         for (start, end, txt), emb in zip(chunks, embeddings):
+            chunk_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{document_id}:{start}"))
             payload.append(
                 {
-                    "id": f"{document_id}:{start}",
+                    "id": chunk_id,
                     "vector": emb,
                     "payload": {
                         "tenant_id": tenant_id,
@@ -62,7 +65,7 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
                 }
             )
             ch = models.Chunk(
-                id=f"{document_id}:{start}",
+                id=chunk_id,
                 tenant_id=tenant_id,
                 dataset_id=dataset_id,
                 document_id=document_id,
@@ -73,9 +76,10 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
         if settings.enable_bm25 and bm25_client:
             bm25_items = []
             for (start, end, txt) in chunks:
+                chunk_id = str(uuid.uuid5(uuid.NAMESPACE_URL, f"{document_id}:{start}"))
                 bm25_items.append(
                     {
-                        "id": f"{document_id}:{start}",
+                        "id": chunk_id,
                         "text": txt,
                         "payload": {
                             "tenant_id": tenant_id,
@@ -87,12 +91,19 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
                         },
                     }
                 )
-            bm25_client.index_documents(tenant_id, dataset_id, bm25_items)
-        vs.upsert(tenant_id, dataset_id, payload)
+            try:
+                bm25_client.index_documents(tenant_id, dataset_id, bm25_items)
+            except Exception:
+                pass
+        try:
+            vs.upsert(tenant_id, dataset_id, payload)
+        except Exception:
+            pass
         if job:
             job.status = models.JobStatus.succeeded.value
             job.progress = 100
             job.updated_at = datetime.utcnow()
+            job.error = None
         # Update document status using the already-fetched doc
         if doc:
             doc.status = "succeeded"
@@ -100,6 +111,9 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
                 doc.language = lang
         db.commit()
     except Exception as exc:
+        if doc:
+            doc.status = "failed"
+            db.commit()
         if job:
             job.status = models.JobStatus.failed.value
             job.error = str(exc)

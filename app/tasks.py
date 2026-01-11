@@ -1,17 +1,31 @@
 from typing import Any
 
+from app.config import get_settings
 from workers import tasks as worker_tasks
 from core import pipeline
+
+settings = get_settings()
 
 
 def enqueue_ingest(job_payload: dict[str, Any]) -> None:
     """
-    Placeholder enqueue. In production, this would delay Celery tasks.
+    Enqueue ingest; in dev, run inline so uploads complete without a worker.
     """
+    if settings.environment == "dev":
+        pipeline.ingest_document(
+            job_id=job_payload["job_id"],
+            tenant_id=job_payload["tenant_id"],
+            dataset_id=job_payload["dataset_id"],
+            document_id=job_payload["document_id"],
+            path=job_payload["path"],
+            mime_type=job_payload.get("mime_type"),
+            embedder=job_payload.get("embedder"),
+        )
+        return
     try:
         worker_tasks.ingest_document.delay(job_payload)
     except Exception:
-        # Celery not configured in dev; run inline for immediate parse path
+        # Celery not configured or broker unavailable; run inline
         pipeline.ingest_document(
             job_id=job_payload["job_id"],
             tenant_id=job_payload["tenant_id"],
@@ -24,6 +38,14 @@ def enqueue_ingest(job_payload: dict[str, Any]) -> None:
 
 
 def enqueue_reindex(job_payload: dict[str, Any]) -> None:
+    if settings.environment == "dev":
+        pipeline.reindex_dataset(
+            job_id=job_payload["job_id"],
+            tenant_id=job_payload["tenant_id"],
+            dataset_id=job_payload["dataset_id"],
+            embedder=job_payload.get("embedder"),
+        )
+        return
     try:
         worker_tasks.reindex_dataset.delay(job_payload)
     except Exception:

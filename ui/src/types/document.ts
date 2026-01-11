@@ -1,17 +1,24 @@
 export interface Document {
   id: string;
   dataset_id: string;
-  title: string;
-  content?: string;
-  file_type?: string;
-  file_size?: number;
-  chunk_count?: number;
-  status?: 'pending' | 'processing' | 'completed' | 'failed';
+  filename: string;
+  mime_type?: string | null;
+  size_bytes?: number | null;
+  language?: string | null;
+  status?: string;
+  source_uri?: string | null;
   created_at?: string;
-  updated_at?: string;
 }
 
 export interface UploadDocumentRequest {
   dataset_id: string;
   file: File;
+}
+
+export interface DocumentListResponse {
+  items: Document[];
+  total: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
 }

@@ -1,15 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
-import { Document } from '@/types/document';
+import { Document, DocumentListResponse } from '@/types/document';
 
 export function useDocuments(datasetId?: string) {
   return useQuery({
     queryKey: QUERY_KEYS.DOCUMENTS(datasetId),
     queryFn: async () => {
       const params = datasetId ? { dataset_id: datasetId } : {};
-      const response = await api.get<Document[]>(API_ENDPOINTS.DOCUMENTS, { params });
-      return response.data;
+      const response = await api.get<DocumentListResponse>(API_ENDPOINTS.DOCUMENTS, { params });
+      return response.data.items;
     },
     enabled: !!datasetId,
   });
