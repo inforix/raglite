@@ -8,10 +8,11 @@ from passlib.hash import pbkdf2_sha256
 
 from app.config import get_settings
 from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse
-from app.settings_service import get_app_settings_db
+from app.settings_service import get_app_settings_db, get_allowed_model_names
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import storage, vectorstore
 from infra import models
+from infra.models import ModelType
 from app import tasks
 
 settings = get_settings()
@@ -21,7 +22,8 @@ vs = vectorstore.get_vector_store()
 def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> DatasetOut:
     app_settings = get_app_settings_db(db)
     embedder = payload.embedder or app_settings.default_embedder
-    if embedder not in settings.allowed_embedders:
+    allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
+    if embedder not in allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
     ds = models.Dataset(
         id=str(uuid.uuid4()),
@@ -96,7 +98,8 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
     if payload.description is not None:
         ds.description = payload.description
     if payload.embedder is not None:
-        if payload.embedder not in settings.allowed_embedders:
+        allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
+        if payload.embedder not in allowed_embedders:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
         ds.embedder = payload.embedder
     elif not ds.embedder:

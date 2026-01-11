@@ -9,16 +9,40 @@ from app import services
 from app.config import get_settings
 from app.dedup import find_duplicate_document
 from app.deps import TenantContext, get_tenant
-from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, QueryRequest, QueryResponse, DocumentOut, DocumentUpdate, DocumentListResponse, SettingsOut, SettingsUpdate
+from app.schemas import (
+    DatasetCreate,
+    DatasetUpdate,
+    DatasetOut,
+    DocumentUploadResponse,
+    JobOut,
+    QueryRequest,
+    QueryResponse,
+    DocumentOut,
+    DocumentUpdate,
+    DocumentListResponse,
+    SettingsOut,
+    SettingsUpdate,
+    ModelConfigCreate,
+    ModelConfigOut,
+    ModelConfigUpdate,
+)
 from app.schemas_tenant import TenantCreate, TenantOut
 from app.schemas_auth import LoginRequest, LoginResponse, UserOut
 from app.auth import get_current_user as get_current_user_dep
 from core import embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
 from infra import models
-from infra.models import User
+from infra.models import User, ModelType
 from infra.db import get_db
-from app.settings_service import get_app_settings_db, update_app_settings_db
+from app.settings_service import (
+    get_app_settings_db,
+    update_app_settings_db,
+    get_model_configs,
+    create_model_config,
+    update_model_config,
+    delete_model_config,
+    get_allowed_model_names,
+)
 
 router = APIRouter()
 settings = get_settings()
@@ -29,11 +53,13 @@ bm25_client = opensearch_bm25.get_bm25_client()
 @router.get("/settings", tags=["settings"], response_model=SettingsOut)
 async def get_settings_endpoint(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_dep)) -> SettingsOut:
     app_settings = get_app_settings_db(db)
+    embedders = get_model_configs(db, ModelType.embedder)
+    chat_models = get_model_configs(db, ModelType.chat)
     return SettingsOut(
         default_embedder=app_settings.default_embedder,
-        allowed_embedders=settings.allowed_embedders,
         default_chat_model=app_settings.default_chat_model,
-        allowed_chat_models=settings.allowed_chat_models,
+        embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in embedders],
+        chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in chat_models],
     )
 
 
@@ -43,19 +69,82 @@ async def update_settings_endpoint(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user_dep),
 ) -> SettingsOut:
-    if payload.default_embedder:
-        if payload.default_embedder not in settings.allowed_embedders:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
-    if payload.default_chat_model:
-        if payload.default_chat_model not in settings.allowed_chat_models:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
+    allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
+    allowed_chat_models = get_allowed_model_names(db, ModelType.chat)
+
+    if payload.default_embedder and payload.default_embedder not in allowed_embedders:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
+    if payload.default_chat_model and payload.default_chat_model not in allowed_chat_models:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
     updated = update_app_settings_db(db, payload.default_embedder, payload.default_chat_model)
     return SettingsOut(
         default_embedder=updated.default_embedder,
-        allowed_embedders=settings.allowed_embedders,
         default_chat_model=updated.default_chat_model,
-        allowed_chat_models=settings.allowed_chat_models,
+        embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.embedder)],
+        chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.chat)],
     )
+
+
+@router.post("/settings/embedders", tags=["settings"], response_model=ModelConfigOut, status_code=status.HTTP_201_CREATED)
+async def create_embedder_model(
+    payload: ModelConfigCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+) -> ModelConfigOut:
+    mc = create_model_config(db, ModelType.embedder, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.put("/settings/embedders/{model_id}", tags=["settings"], response_model=ModelConfigOut)
+async def update_embedder_model(
+    model_id: str,
+    payload: ModelConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+) -> ModelConfigOut:
+    mc = update_model_config(db, model_id, ModelType.embedder, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.delete("/settings/embedders/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
+async def delete_embedder_model(
+    model_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+):
+    delete_model_config(db, model_id, ModelType.embedder)
+    return {}
+
+
+@router.post("/settings/chat-models", tags=["settings"], response_model=ModelConfigOut, status_code=status.HTTP_201_CREATED)
+async def create_chat_model(
+    payload: ModelConfigCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+) -> ModelConfigOut:
+    mc = create_model_config(db, ModelType.chat, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.put("/settings/chat-models/{model_id}", tags=["settings"], response_model=ModelConfigOut)
+async def update_chat_model(
+    model_id: str,
+    payload: ModelConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+) -> ModelConfigOut:
+    mc = update_model_config(db, model_id, ModelType.chat, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.delete("/settings/chat-models/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
+async def delete_chat_model(
+    model_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user_dep),
+):
+    delete_model_config(db, model_id, ModelType.chat)
+    return {}
 
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED, tags=["tenants"], response_model=TenantOut)
@@ -319,7 +408,8 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
 @router.post("/reindex", status_code=status.HTTP_202_ACCEPTED, tags=["maintenance"])
 async def reindex(dataset_id: str, embedder: Optional[str] = None, tenant: TenantContext = Depends(get_tenant), db: Session = Depends(get_db)):
     ds = services.ensure_dataset(db, tenant.tenant_id, dataset_id)
-    if embedder and embedder not in settings.allowed_embedders:
+    allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
+    if embedder and embedder not in allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
     target_embedder = embedder or ds.embedder
     job_id = services.create_reindex_job(db, tenant.tenant_id, dataset_id, target_embedder)

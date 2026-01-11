@@ -97,11 +97,35 @@ class QueryResponse(BaseModel):
     results: List[QueryHit] = Field(default_factory=list)
 
 
+class ModelConfigBase(BaseModel):
+    name: str
+    endpoint: str
+    api_key: Optional[str] = None
+    model: str
+
+
+class ModelConfigOut(ModelConfigBase):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    type: str
+
+
+class ModelConfigCreate(ModelConfigBase):
+    pass
+
+
+class ModelConfigUpdate(BaseModel):
+    name: Optional[str] = None
+    endpoint: Optional[str] = None
+    api_key: Optional[str] = None
+    model: Optional[str] = None
+
+
 class SettingsOut(BaseModel):
     default_embedder: str
-    allowed_embedders: List[str]
     default_chat_model: str
-    allowed_chat_models: List[str]
+    embedders: List[ModelConfigOut]
+    chat_models: List[ModelConfigOut]
 
 
 class SettingsUpdate(BaseModel):

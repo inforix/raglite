@@ -25,6 +25,10 @@ export const API_ENDPOINTS = {
 
   // Settings
   SETTINGS: '/v1/settings',
+  SETTINGS_EMBEDDERS: '/v1/settings/embedders',
+  SETTINGS_EMBEDDER: (id: string) => `/v1/settings/embedders/${id}`,
+  SETTINGS_CHAT_MODELS: '/v1/settings/chat-models',
+  SETTINGS_CHAT_MODEL: (id: string) => `/v1/settings/chat-models/${id}`,
 };
 
 export const QUERY_KEYS = {

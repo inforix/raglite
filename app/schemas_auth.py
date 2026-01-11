@@ -1,9 +1,9 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     name: Optional[str] = None
 
 
@@ -21,7 +21,7 @@ class UserOut(UserBase):
 
 
 class LoginRequest(BaseModel):
-    email: EmailStr
+    email: str
     password: str
 
 

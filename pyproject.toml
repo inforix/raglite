@@ -26,11 +26,12 @@ dependencies = [
     "langdetect",
     "python-multipart",
     "email-validator",
+    "psycopg2-binary",
+    "numpy<2",
     "torch==2.1.2",
 ]
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest>=0"]
 
 [tool.uv]
-dev-dependencies = ["pytest"]
