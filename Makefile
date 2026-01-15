@@ -12,7 +12,8 @@ ENV_EXAMPLE := .env.example
 .PHONY: dev build stop clean ui-build
 
 dev: $(ENV_FILE) $(UI_BUILD)
-	$(DEV_COMPOSE) up -d --build
+	$(DEV_COMPOSE) up -d
+	uv run uvicorn app.main:app --host 0.0.0.0 --port 7615 --reload
 
 build: $(ENV_FILE) $(UI_BUILD)
 	$(PROD_COMPOSE) build
