@@ -29,5 +29,5 @@ clean: stop
 
 ui-build: $(UI_BUILD)
 
-$(UI_BUILD): $(UI_SRC) ui/package-lock.json ui/package.json ui/vite.config.ts
-	cd ui && npm ci && npm run build
+$(UI_BUILD): $(UI_SRC) ui/bun.lock ui/package.json ui/vite.config.ts
+	cd ui && bun install --frozen-lockfile --save-text-lockfile && bun run build

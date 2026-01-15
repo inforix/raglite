@@ -279,7 +279,7 @@ async def serve_ui(full_path: str):
 ### Initial Setup
 ```bash
 cd ui
-npm install
+bun install
 ```
 
 ### Development Mode
@@ -290,13 +290,13 @@ uvicorn app.main:app --reload --port 7615
 
 # Terminal 2: Run frontend dev server
 cd ui
-npm run dev  # Runs on port 5173 with proxy to :7615
+bun run dev  # Runs on port 5173 with proxy to :7615
 ```
 
 ### Production Build
 ```bash
 cd ui
-npm run build  # Outputs to ui/dist/
+bun run build  # Outputs to ui/dist/
 
 # FastAPI serves from ui/dist/
 ```

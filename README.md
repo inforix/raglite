@@ -38,7 +38,7 @@ git clone https://github.com/inforix/raglite.git
 cd raglite
 
 # Build the UI (first time only)
-cd ui && npm install && npm run build && cd ..
+cd ui && bun install && bun run build && cd ..
 
 # Start all services (Postgres, Qdrant, Redis, OpenSearch, API, Worker)
 docker compose up -d

@@ -32,7 +32,8 @@ uv run python scripts/create_admin_standalone.py
 echo ""
 echo "🎨 Step 4: Rebuilding UI..."
 cd ui
-npm run build 2>&1 | grep -E "(built in|error|warning)" || true
+bun install --frozen-lockfile --save-text-lockfile
+bun run build 2>&1 | grep -E "(built in|error|warning)" || true
 cd ..
 
 # Step 5: Check server

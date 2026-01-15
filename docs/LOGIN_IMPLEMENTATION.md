@@ -112,7 +112,8 @@ Default credentials:
 ### 4. Rebuild UI
 ```bash
 cd ui
-npm run build
+bun install --frozen-lockfile
+bun run build
 ```
 
 ### 5. Start the Server
