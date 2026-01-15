@@ -6,13 +6,15 @@ PROD_COMPOSE := $(DOCKER_COMPOSE) -f docker-compose.yml
 
 UI_BUILD := ui/dist/index.html
 UI_SRC := $(shell find ui/src -type f)
+ENV_FILE := .env
+ENV_EXAMPLE := .env.example
 
 .PHONY: dev build stop clean ui-build
 
-dev: $(UI_BUILD)
+dev: $(ENV_FILE) $(UI_BUILD)
 	$(DEV_COMPOSE) up -d --build
 
-build: $(UI_BUILD)
+build: $(ENV_FILE) $(UI_BUILD)
 	$(PROD_COMPOSE) build
 
 stop:
@@ -28,6 +30,12 @@ clean: stop
 	rm -rf .pytest_cache ui/dist ui/node_modules
 
 ui-build: $(UI_BUILD)
+
+$(ENV_FILE):
+	@if [ ! -f "$(ENV_FILE)" ] && [ -f "$(ENV_EXAMPLE)" ]; then \
+		echo "Creating $(ENV_FILE) from $(ENV_EXAMPLE)"; \
+		cp "$(ENV_EXAMPLE)" "$(ENV_FILE)"; \
+	fi
 
 $(UI_BUILD): $(UI_SRC) ui/bun.lock ui/package.json ui/vite.config.ts
 	cd ui && bun install --frozen-lockfile --save-text-lockfile && bun run build
