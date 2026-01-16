@@ -206,9 +206,9 @@ ui/
   - Total tenants
   - Total datasets
   - Total documents
-  - Recent activity
+  - Total queries
+- Daily query volume chart (last N days, default 14)
 - Quick actions
-- Recent queries
 
 ## Backend Integration
 
@@ -222,12 +222,11 @@ GET    /v1/auth/me          # Get current user info
 POST   /v1/auth/refresh     # Refresh JWT token
 ```
 
-#### Query/Chat
+#### Query/Analytics
 ```
-POST   /v1/query/stream     # Streaming query with SSE
-GET    /v1/query/history    # Get chat history
-POST   /v1/query/history    # Save chat message
-DELETE /v1/query/history/:id # Delete conversation
+POST   /v1/query             # Execute query
+GET    /v1/query/history     # Query log totals for dashboard metrics
+GET    /v1/query/stats/daily # Daily query counts for charts
 ```
 
 #### Static Files
@@ -243,6 +242,7 @@ POST   /v1/tenants
 GET    /v1/tenants/:id
 PUT    /v1/tenants/:id
 DELETE /v1/tenants/:id
+POST   /v1/tenants/:id/regenerate-key
 
 # Datasets
 GET    /v1/datasets?tenant_id=xxx

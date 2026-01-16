@@ -110,6 +110,7 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 7615
 - Token storage in localStorage (persists across sessions)
 - Automatic token validation on protected routes
 - 401 handling with auto-redirect to login
+- Tenant API keys can be rotated (old keys become inactive)
 
 ⚠️ **Production Checklist:**
 - [ ] Change JWT secret key (environment variable)
@@ -174,6 +175,23 @@ curl http://localhost:7615/tenants \
   -H "Authorization: Bearer <your-token>" \
   -H "X-Tenant-Id: <tenant-id>"
 ```
+
+### Regenerate Tenant API Key
+```bash
+curl -X POST http://localhost:7615/v1/tenants/<tenant-id>/regenerate-key \
+  -H "Authorization: Bearer <your-token>"
+```
+
+Response:
+```json
+{
+  "tenant_id": "uuid-here",
+  "api_key": "new-plain-text-key",
+  "created_at": "2024-01-01T12:00:00Z"
+}
+```
+
+Note: Regenerating a key disables all previous keys for that tenant.
 
 ## Troubleshooting
 

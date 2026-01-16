@@ -9,12 +9,15 @@
 - Embedding config: default model `all-MiniLM-L6-v2`; administrator defines allowed models; tenants can select per-tenant or per-dataset embedder from the allowed list (stored with dataset settings); reindex job required on change.
 - Runtime: API listens on port 7615 by default; worker queue uses Redis; configuration via environment with sensible defaults.
 - Pipeline: upload/register (supports multiple documents per request) → immediate parse/extract text per file → chunk → embed (batch) → upsert to vector store (tenant + dataset filter) → mark job progress.
-- Query: optional rewrite → embed query → vector search (filters: dataset_ids, metadata) → optional hybrid BM25 → optional rerank → return chunks with provenance.
+- Query: optional rewrite → embed query → vector search (filters: dataset_ids, metadata) → optional hybrid BM25 → optional rerank → return chunks with provenance; log query for metrics.
 - API surface (REST, OAS 3.1, root `/` serves docs):
   - POST /v1/tenants (admin)
+  - POST /v1/tenants/{id}/regenerate-key
   - POST /v1/datasets, GET /v1/datasets
   - POST /v1/documents (multipart, multiple files allowed; fields: `files[]`, `dataset_id`, optional `source_uri`; returns job ids per file), GET /v1/jobs/{id}
   - POST /v1/query (params: query, dataset_ids?, filters?, k, rewrite?)
+  - GET /v1/query/history (query log totals for metrics)
+  - GET /v1/query/stats/daily?days=14 (daily query counts)
   - POST /v1/reindex, DELETE /v1/datasets/{id}
   - DELETE /v1/documents/{id} (soft delete + cleanup job)
 - Non-goals (v0.1): UI, chat orchestration, eval suite, billing, ACL beyond tenant key.

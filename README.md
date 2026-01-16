@@ -130,14 +130,18 @@ uv run celery -A workers.worker.celery_app worker --loglevel=info
 3) Retrieve: vector search in tenant namespace + optional filters (dataset, metadata).
 4) Hybrid retrieval: BM25 + vector with fused scores (optional).
 5) Rerank: lightweight cross-encoder (or client-provided reranker); return top-k chunks with provenance; cross-language depends on model choice.
+6) Log query for usage metrics and dashboard stats.
 
 ## API Sketch (REST)
 - `POST /v1/tenants` (admin) create tenant + API key.
+- `POST /v1/tenants/{id}/regenerate-key` rotate tenant API key (old keys become inactive).
 - `POST /v1/datasets` create dataset (requires API key).
 - `GET /v1/datasets` list.
 - `POST /v1/documents` multipart upload (multiple files: `files[]`, `dataset_id`, optional `source_uri`); returns job ids.
 - `GET /v1/jobs/{id}` job status/progress.
 - `POST /v1/query` body: `query`, `dataset_ids?`, `k`, `filters?`, `rewrite=true|false`; returns rewritten query, retrieved chunks, scores, metadata.
+- `GET /v1/query/history` query log totals for dashboard metrics.
+- `GET /v1/query/stats/daily?days=14` daily query counts for charts.
 - `POST /v1/reindex` re-embed a dataset with new model.
 - `DELETE /v1/datasets/{id}`, `DELETE /v1/documents/{id}` soft delete and trigger cleanup.
 
@@ -210,7 +214,7 @@ def query(payload: QueryRequest, tenant=Depends(auth)):
 - Wire production DB/Redis/Qdrant and add Alembic migrations for schema.
 - Replace in-memory rate limiter/cache with Redis-based implementations.
 - Add richer parsers (Docx/OCR) and hybrid BM25 (e.g., Elastic) plus reranker defaults.
-- Add auth management endpoints (rotate/revoke keys) and hashed key rotation tooling.
+- Add key revocation/list endpoints and audit trails for key changes.
 - Expand tests: integration for ingest→query across tenants; vector store adapter tests; reranker/rewriter coverage.
 
 ## Specs
