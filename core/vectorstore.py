@@ -77,11 +77,22 @@ class QdrantVectorStore:
         for ds in target_datasets:
             collection = self._collection_name(tenant_id, ds)
             try:
-                search_result = self._client.search(
-                    collection_name=collection,
-                    query_vector=vector,
-                    limit=k,
-                )
+                if hasattr(self._client, "search"):
+                    search_result = self._client.search(
+                        collection_name=collection,
+                        query_vector=vector,
+                        limit=k,
+                    )
+                elif hasattr(self._client, "query_points"):
+                    response = self._client.query_points(
+                        collection_name=collection,
+                        query=vector,
+                        limit=k,
+                        with_payload=True,
+                    )
+                    search_result = response.points
+                else:
+                    raise AttributeError("Qdrant client does not support search/query_points")
                 for r in search_result:
                     results.append({"id": r.id, "score": r.score, "payload": r.payload})
             except Exception:

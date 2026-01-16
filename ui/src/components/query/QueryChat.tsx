@@ -137,11 +137,13 @@ export function QueryChat() {
         dataset_ids: [selectedDatasetId],
         k: 5,
         rewrite: true,
+        answer: true,
       };
       const response = await api.post(API_ENDPOINTS.QUERY, payload);
       const data = response.data as {
         query: string;
         rewritten?: string;
+        answer?: string;
         results: Array<{
           text: string;
           score: number;
@@ -153,7 +155,10 @@ export function QueryChat() {
       };
 
       const results = data.results ?? [];
-      const answer = buildAnswer(data.query || userMessage.content, results);
+      const answer =
+        data.answer && data.answer.trim().length > 0
+          ? data.answer.trim()
+          : buildAnswer(data.query || userMessage.content, results);
 
       const assistantMessage: Message = {
         role: 'assistant',

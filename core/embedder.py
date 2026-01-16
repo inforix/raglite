@@ -1,4 +1,5 @@
 from functools import lru_cache
+import logging
 from typing import List, Optional
 
 import requests
@@ -9,6 +10,7 @@ from infra import models
 from infra.db import SessionLocal
 
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=8)
@@ -46,6 +48,13 @@ def _embed_openai_compatible(texts: List[str], cfg: models.ModelConfig) -> List[
     return [item.get("embedding", []) for item in data]
 
 
+def _embed_with_config(texts: List[str], cfg: Optional[models.ModelConfig], target_model: str) -> List[List[float]]:
+    if cfg and cfg.endpoint:
+        return _embed_openai_compatible(texts, cfg)
+    model = _load_model(target_model)
+    return model.encode(texts, normalize_embeddings=True).tolist()
+
+
 def embed_texts(texts: List[str], model_name: Optional[str] = None) -> List[List[float]]:
     """
     Embed texts using either an OpenAI-compatible endpoint (if configured) or a local sentence-transformers model.
@@ -53,10 +62,19 @@ def embed_texts(texts: List[str], model_name: Optional[str] = None) -> List[List
     cfg = _resolve_embedder_config(model_name)
     target_model = cfg.model if cfg else (model_name or settings.default_embedder)
     try:
-        if cfg and cfg.endpoint:
-            return _embed_openai_compatible(texts, cfg)
-        model = _load_model(target_model)
-        return model.encode(texts, normalize_embeddings=True).tolist()
-    except Exception:
-        dim = 384
-        return [[0.0] * dim for _ in texts]
+        return _embed_with_config(texts, cfg, target_model)
+    except Exception as exc:
+        logger.warning("Embedder failed for model '%s': %s", target_model, exc)
+
+    if model_name and model_name != settings.default_embedder:
+        try:
+            fallback_cfg = _resolve_embedder_config(None)
+            fallback_model = fallback_cfg.model if fallback_cfg else settings.default_embedder
+            if fallback_model != target_model:
+                logger.warning("Falling back to default embedder '%s'", fallback_model)
+                return _embed_with_config(texts, fallback_cfg, fallback_model)
+        except Exception as exc:
+            logger.warning("Default embedder fallback failed: %s", exc)
+
+    dim = 384
+    return [[0.0] * dim for _ in texts]
