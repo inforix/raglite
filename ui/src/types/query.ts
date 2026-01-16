@@ -13,3 +13,12 @@ export interface QueryHistoryResponse {
   page_size: number;
   total_pages: number;
 }
+
+export interface QueryDailyStat {
+  date: string;
+  count: number;
+}
+
+export interface QueryDailyStatsResponse {
+  items: QueryDailyStat[];
+}

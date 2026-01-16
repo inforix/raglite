@@ -21,6 +21,7 @@ from app.schemas import (
     DocumentUpdate,
     DocumentListResponse,
     QueryHistoryResponse,
+    QueryDailyStatsResponse,
     SettingsOut,
     SettingsUpdate,
     ModelConfigCreate,
@@ -443,6 +444,17 @@ async def query_history(
     if page_size < 1 or page_size > 100:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page size must be between 1 and 100")
     return services.list_query_history(db, tenant.tenant_id, page, page_size)
+
+
+@router.get("/query/stats/daily", tags=["query"], response_model=QueryDailyStatsResponse)
+async def query_daily_stats(
+    days: int = 14,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> QueryDailyStatsResponse:
+    if days < 1 or days > 90:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="days must be between 1 and 90")
+    return services.get_query_daily_stats(db, tenant.tenant_id, days)
 
 
 @router.post("/reindex", status_code=status.HTTP_202_ACCEPTED, tags=["maintenance"])

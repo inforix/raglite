@@ -23,6 +23,7 @@ export const API_ENDPOINTS = {
   QUERY: '/v1/query',
   QUERY_STREAM: '/v1/query/stream',
   QUERY_HISTORY: '/v1/query/history',
+  QUERY_STATS_DAILY: '/v1/query/stats/daily',
 
   // Settings
   SETTINGS: '/v1/settings',
@@ -41,4 +42,5 @@ export const QUERY_KEYS = {
   DOCUMENT: (id: string) => ['document', id],
   ME: ['me'],
   QUERIES_COUNT: ['queries-count'],
+  QUERIES_DAILY: ['queries-daily'],
 };

@@ -177,6 +177,7 @@ export function QueryChat() {
       };
       setMessages((prev) => [...prev, assistantMessage]);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.QUERIES_COUNT });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.QUERIES_DAILY });
     } catch (error: any) {
       console.error('Query error:', error);
       const detail = error?.response?.data?.detail;

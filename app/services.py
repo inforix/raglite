@@ -1,13 +1,14 @@
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 
 from app.config import get_settings
-from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse, QueryHistoryResponse, QueryHistoryItem
+from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse, QueryHistoryResponse, QueryHistoryItem, QueryDailyStatsResponse, QueryDailyStat
 from app.settings_service import get_app_settings_db, get_allowed_model_names
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import storage, vectorstore
@@ -473,6 +474,41 @@ def list_query_history(
         page_size=page_size,
         total_pages=total_pages,
     )
+
+
+def get_query_daily_stats(
+    db: Session,
+    tenant_id: str,
+    days: int = 14,
+) -> QueryDailyStatsResponse:
+    if days < 1:
+        days = 1
+    end_date = datetime.utcnow().date()
+    start_date = end_date - timedelta(days=days - 1)
+    start_dt = datetime.combine(start_date, datetime.min.time())
+
+    rows = (
+        db.query(func.date(models.QueryLog.created_at).label("day"), func.count(models.QueryLog.id).label("count"))
+        .filter(
+            models.QueryLog.tenant_id == tenant_id,
+            models.QueryLog.created_at >= start_dt,
+        )
+        .group_by(func.date(models.QueryLog.created_at))
+        .all()
+    )
+    counts = {}
+    for row in rows:
+        day_value = row.day
+        day_str = day_value.isoformat() if hasattr(day_value, "isoformat") else str(day_value)
+        counts[day_str] = int(row.count)
+
+    items = []
+    for idx in range(days):
+        day = start_date + timedelta(days=idx)
+        day_str = day.isoformat()
+        items.append(QueryDailyStat(date=day_str, count=counts.get(day_str, 0)))
+
+    return QueryDailyStatsResponse(items=items)
 
 
 def update_document(db: Session, tenant_id: str, document_id: str, payload: DocumentUpdate) -> DocumentOut:

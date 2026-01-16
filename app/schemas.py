@@ -120,6 +120,15 @@ class QueryHistoryResponse(BaseModel):
     total_pages: int
 
 
+class QueryDailyStat(BaseModel):
+    date: str
+    count: int
+
+
+class QueryDailyStatsResponse(BaseModel):
+    items: List[QueryDailyStat] = Field(default_factory=list)
+
+
 class ModelConfigBase(BaseModel):
     name: str
     endpoint: str
