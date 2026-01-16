@@ -77,20 +77,27 @@ export function SettingsPage() {
     fetchSettings();
   }, []);
 
-  const handleSaveDefaults = async () => {
+  const handleSaveDefaults = async (
+    nextEmbedder: string,
+    nextChatModel: string,
+    prevEmbedder: string,
+    prevChatModel: string,
+  ) => {
     if (!data) return;
     setSaving(true);
     setError('');
     setSuccess('');
     try {
       const response = await api.put<SettingsResponse>(API_ENDPOINTS.SETTINGS, {
-        default_embedder: defaultEmbedder,
-        default_chat_model: defaultChatModel,
+        default_embedder: nextEmbedder,
+        default_chat_model: nextChatModel,
       });
       setData(response.data);
       setSuccess('Default models updated.');
       fetchSettings(true);
     } catch (err: any) {
+      setDefaultEmbedder(prevEmbedder);
+      setDefaultChatModel(prevChatModel);
       setError(err?.response?.data?.detail || 'Failed to save settings.');
     } finally {
       setSaving(false);
@@ -323,7 +330,7 @@ export function SettingsPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="space-y-4">
         <Card>
           <CardHeader>
             <CardTitle>Embedding models</CardTitle>
@@ -334,7 +341,13 @@ export function SettingsPage() {
               <select
                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
                 value={defaultEmbedder}
-                onChange={(e) => setDefaultEmbedder(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  const prevEmbedder = defaultEmbedder;
+                  const prevChat = defaultChatModel;
+                  setDefaultEmbedder(nextValue);
+                  void handleSaveDefaults(nextValue, defaultChatModel, prevEmbedder, prevChat);
+                }}
                 disabled={disabled || embedders.length === 0}
               >
                 {embedders.map((opt) => (
@@ -374,7 +387,13 @@ export function SettingsPage() {
               <select
                 className="w-full h-10 px-3 rounded-md border border-input bg-background"
                 value={defaultChatModel}
-                onChange={(e) => setDefaultChatModel(e.target.value)}
+                onChange={(e) => {
+                  const nextValue = e.target.value;
+                  const prevEmbedder = defaultEmbedder;
+                  const prevChat = defaultChatModel;
+                  setDefaultChatModel(nextValue);
+                  void handleSaveDefaults(defaultEmbedder, nextValue, prevEmbedder, prevChat);
+                }}
                 disabled={disabled || chatModels.length === 0}
               >
                 {chatModels.map((opt) => (
@@ -418,9 +437,6 @@ export function SettingsPage() {
       <div className="flex gap-2">
         <Button variant="outline" onClick={() => fetchSettings()} disabled={loading}>
           Reload
-        </Button>
-        <Button onClick={handleSaveDefaults} disabled={disabled}>
-          {saving ? 'Saving...' : 'Save defaults'}
         </Button>
       </div>
     </div>
