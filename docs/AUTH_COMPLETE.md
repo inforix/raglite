@@ -193,9 +193,9 @@ curl http://localhost:7615/tenants \
 - **Solution**: Use different email or login with existing credentials
 
 ### Migration Errors
-- **Check status**: `echo "SELECT * FROM alembic_version;" | sqlite3 raglite.db`
+- **Check status**: `psql "postgresql://raglite:raglite@localhost:5432/raglite" -c "SELECT * FROM alembic_version;"`
 - **Manual migration**: `uv run python scripts/run_migrations.py`
-- **Reset (dev only)**: Delete `raglite.db` and re-run setup
+- **Reset (dev only)**: `dropdb raglite && createdb raglite` (or remove the compose volume)
 
 ## Files Modified/Created
 

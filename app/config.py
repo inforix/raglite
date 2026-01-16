@@ -57,7 +57,7 @@ class Settings(BaseSettings):
 
     # External services
     redis_url: str = "redis://localhost:6379/0"
-    postgres_dsn: str = "sqlite:///./raglite.db"
+    postgres_dsn: str = "postgresql://raglite:raglite@localhost:5432/raglite"
     qdrant_url: HttpUrl | str = "http://localhost:6333"
     object_store_root: str = "./data"
 

@@ -6,12 +6,17 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 
-def run_migrations(db_path="sqlite:///./raglite.db"):
+DEFAULT_DSN = "postgresql://raglite:raglite@localhost:5432/raglite"
+
+
+def run_migrations(db_path=None):
     """Run all pending migrations directly."""
-    
+    if not db_path:
+        db_path = os.getenv("RAGLITE_POSTGRES_DSN", DEFAULT_DSN)
+
     engine = create_engine(db_path)
     
     with Session(engine) as db:
@@ -31,11 +36,7 @@ def run_migrations(db_path="sqlite:///./raglite.db"):
         print(f"Current migration version: {current_version or 'None'}")
         
         # Check if users table exists
-        result = db.execute(text(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
-        ))
-        
-        if not result.fetchone():
+        if not inspect(engine).has_table("users"):
             print("Creating users table...")
             
             # Create users table
@@ -45,10 +46,10 @@ def run_migrations(db_path="sqlite:///./raglite.db"):
                     email VARCHAR NOT NULL,
                     password_hash VARCHAR NOT NULL,
                     name VARCHAR,
-                    is_active BOOLEAN NOT NULL DEFAULT 1,
-                    is_superuser BOOLEAN NOT NULL DEFAULT 0,
-                    created_at DATETIME NOT NULL,
-                    updated_at DATETIME NOT NULL,
+                    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+                    is_superuser BOOLEAN NOT NULL DEFAULT FALSE,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL,
                     PRIMARY KEY (id)
                 )
             """))
