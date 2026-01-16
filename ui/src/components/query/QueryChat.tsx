@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Send, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,7 +8,7 @@ import { useTenants } from '@/hooks/useTenants';
 import { useDatasets } from '@/hooks/useDatasets';
 import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
-import { API_ENDPOINTS } from '@/lib/constants';
+import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
 
 interface SourceItem {
   text: string;
@@ -32,6 +33,7 @@ export function QueryChat() {
   const [selectedTenantId, setSelectedTenantId] = useState('');
   const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const queryClient = useQueryClient();
 
   const { data: tenants } = useTenants();
   const { data: datasets } = useDatasets(selectedTenantId || undefined);
@@ -174,6 +176,7 @@ export function QueryChat() {
         rewritten: data.rewritten,
       };
       setMessages((prev) => [...prev, assistantMessage]);
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.QUERIES_COUNT });
     } catch (error: any) {
       console.error('Query error:', error);
       const detail = error?.response?.data?.detail;

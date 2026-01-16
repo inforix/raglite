@@ -20,6 +20,7 @@ from app.schemas import (
     DocumentOut,
     DocumentUpdate,
     DocumentListResponse,
+    QueryHistoryResponse,
     SettingsOut,
     SettingsUpdate,
     ModelConfigCreate,
@@ -423,7 +424,25 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
             if request.answer_model not in allowed_chat_models:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
         answer = answerer.generate_answer(request.query, reranked, request.answer_model)
+    try:
+        services.log_query(db, tenant.tenant_id, request.query, request.dataset_ids)
+    except Exception:
+        pass
     return QueryResponse(query=request.query, rewritten=rewritten, results=reranked, answer=answer)
+
+
+@router.get("/query/history", tags=["query"], response_model=QueryHistoryResponse)
+async def query_history(
+    page: int = 1,
+    page_size: int = 20,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+) -> QueryHistoryResponse:
+    if page < 1:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page must be >= 1")
+    if page_size < 1 or page_size > 100:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Page size must be between 1 and 100")
+    return services.list_query_history(db, tenant.tenant_id, page, page_size)
 
 
 @router.post("/reindex", status_code=status.HTTP_202_ACCEPTED, tags=["maintenance"])

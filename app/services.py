@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from passlib.hash import pbkdf2_sha256
 
 from app.config import get_settings
-from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse
+from app.schemas import DatasetCreate, DatasetUpdate, DatasetOut, DocumentUploadResponse, JobOut, DocumentOut, DocumentUpdate, DocumentListResponse, QueryHistoryResponse, QueryHistoryItem
 from app.settings_service import get_app_settings_db, get_allowed_model_names
 from app.schemas_tenant import TenantCreate, TenantOut
 from core import storage, vectorstore
@@ -430,6 +430,48 @@ def get_document(db: Session, tenant_id: str, document_id: str) -> DocumentOut:
         status=doc.status,
         source_uri=doc.source_uri,
         created_at=doc.created_at.isoformat() if doc.created_at else ""
+    )
+
+
+def log_query(db: Session, tenant_id: str, query_text: str, dataset_ids: Optional[List[str]] = None):
+    entry = models.QueryLog(
+        id=str(uuid.uuid4()),
+        tenant_id=tenant_id,
+        dataset_ids=dataset_ids or [],
+        query=query_text,
+    )
+    db.add(entry)
+    db.commit()
+    return entry
+
+
+def list_query_history(
+    db: Session,
+    tenant_id: str,
+    page: int = 1,
+    page_size: int = 20,
+) -> QueryHistoryResponse:
+    query = db.query(models.QueryLog).filter(models.QueryLog.tenant_id == tenant_id)
+    total = query.count()
+    total_pages = (total + page_size - 1) // page_size if total > 0 else 0
+    offset = (page - 1) * page_size
+    rows = query.order_by(models.QueryLog.created_at.desc()).offset(offset).limit(page_size).all()
+    items = [
+        QueryHistoryItem(
+            id=row.id,
+            tenant_id=row.tenant_id,
+            dataset_ids=row.dataset_ids or [],
+            query=row.query,
+            created_at=row.created_at.isoformat() if row.created_at else "",
+        )
+        for row in rows
+    ]
+    return QueryHistoryResponse(
+        items=items,
+        total=total,
+        page=page,
+        page_size=page_size,
+        total_pages=total_pages,
     )
 
 

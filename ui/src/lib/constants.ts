@@ -40,4 +40,5 @@ export const QUERY_KEYS = {
   DOCUMENTS: (datasetId?: string) => ['documents', datasetId],
   DOCUMENT: (id: string) => ['document', id],
   ME: ['me'],
+  QUERIES_COUNT: ['queries-count'],
 };

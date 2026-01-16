@@ -116,6 +116,16 @@ class Chunk(Base):
     document = relationship("Document", back_populates="chunks")
 
 
+class QueryLog(Base):
+    __tablename__ = "query_logs"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
+    tenant_id: Mapped[str] = mapped_column(String, nullable=False)
+    dataset_ids: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    query: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Job(Base):
     __tablename__ = "jobs"
 

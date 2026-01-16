@@ -104,6 +104,22 @@ class QueryResponse(BaseModel):
     answer: Optional[str] = None
 
 
+class QueryHistoryItem(BaseModel):
+    id: str
+    tenant_id: str
+    dataset_ids: Optional[List[str]] = None
+    query: str
+    created_at: str
+
+
+class QueryHistoryResponse(BaseModel):
+    items: List[QueryHistoryItem] = Field(default_factory=list)
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
 class ModelConfigBase(BaseModel):
     name: str
     endpoint: str

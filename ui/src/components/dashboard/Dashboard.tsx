@@ -4,8 +4,9 @@ import { Users, Database, FileText, MessageSquare } from 'lucide-react';
 import { useDatasets } from '@/hooks/useDatasets';
 import { useTenants } from '@/hooks/useTenants';
 import { api } from '@/lib/api';
-import { API_ENDPOINTS } from '@/lib/constants';
+import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
 import { DocumentListResponse } from '@/types/document';
+import { QueryHistoryResponse } from '@/types/query';
 
 export function Dashboard() {
   const tenantsQuery = useTenants();
@@ -14,6 +15,15 @@ export function Dashboard() {
     queryKey: ['documents-count'],
     queryFn: async () => {
       const response = await api.get<DocumentListResponse>(API_ENDPOINTS.DOCUMENTS, {
+        params: { page_size: 1 },
+      });
+      return response.data.total;
+    },
+  });
+  const queriesQuery = useQuery<number, Error>({
+    queryKey: QUERY_KEYS.QUERIES_COUNT,
+    queryFn: async () => {
+      const response = await api.get<QueryHistoryResponse>(API_ENDPOINTS.QUERY_HISTORY, {
         params: { page_size: 1 },
       });
       return response.data.total;
@@ -33,7 +43,7 @@ export function Dashboard() {
   const tenantsCount = tenantsQuery.data?.length;
   const datasetsCount = datasetsQuery.data?.length;
   const documentsCount = documentsQuery.data;
-  const queriesCount = 0;
+  const queriesCount = queriesQuery.data;
 
   return (
     <div className="space-y-6">
@@ -90,7 +100,9 @@ export function Dashboard() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{queriesCount}</div>
+            <div className="text-2xl font-bold">
+              {formatMetric(queriesCount, queriesQuery.isLoading, !!queriesQuery.error)}
+            </div>
             <p className="text-xs text-muted-foreground">Recent queries</p>
           </CardContent>
         </Card>
