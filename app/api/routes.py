@@ -29,7 +29,7 @@ from app.schemas import (
 from app.schemas_tenant import TenantCreate, TenantOut
 from app.schemas_auth import LoginRequest, LoginResponse, UserOut
 from app.auth import get_current_user as get_current_user_dep
-from core import embedder, rewriter, reranker, vectorstore, opensearch_bm25
+from core import answerer, embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
 from infra import models
 from infra.models import User, ModelType
@@ -411,7 +411,14 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
     if min_score is not None:
         merged_list = [hit for hit in merged_list if hit.get("score", 0) >= min_score]
     reranked = reranker.rerank(qtext, merged_list)
-    return QueryResponse(query=request.query, rewritten=rewritten, results=reranked)
+    answer = None
+    if request.answer:
+        if request.answer_model:
+            allowed_chat_models = get_allowed_model_names(db, ModelType.chat)
+            if request.answer_model not in allowed_chat_models:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
+        answer = answerer.generate_answer(request.query, reranked, request.answer_model)
+    return QueryResponse(query=request.query, rewritten=rewritten, results=reranked, answer=answer)
 
 
 @router.post("/reindex", status_code=status.HTTP_202_ACCEPTED, tags=["maintenance"])

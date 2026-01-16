@@ -83,6 +83,8 @@ class QueryRequest(BaseModel):
     rewrite: bool = True
     filters: Optional[dict] = None
     min_score: Optional[float] = None
+    answer: bool = False
+    answer_model: Optional[str] = None
 
 
 class QueryHit(BaseModel):
@@ -99,6 +101,7 @@ class QueryResponse(BaseModel):
     query: str
     rewritten: Optional[str] = None
     results: List[QueryHit] = Field(default_factory=list)
+    answer: Optional[str] = None
 
 
 class ModelConfigBase(BaseModel):
