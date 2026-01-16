@@ -49,3 +49,20 @@ export function useDeleteDocument() {
     },
   });
 }
+
+export function useUpdateDocument() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (variables: { id: string; filename: string; datasetId?: string }) => {
+      const response = await api.put<Document>(API_ENDPOINTS.DOCUMENT(variables.id), {
+        filename: variables.filename,
+      });
+      return response.data;
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENTS(variables.datasetId) });
+      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DOCUMENT(variables.id) });
+    },
+  });
+}

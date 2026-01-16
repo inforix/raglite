@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useTenants, useDeleteTenant } from '@/hooks/useTenants';
 import { TenantDialog } from './TenantDialog';
@@ -45,23 +45,22 @@ export function TenantsList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="w-full">
           <h1 className="text-3xl font-bold">Tenants</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage your tenants and organizations
-          </p>
+          <div className="mt-2 flex w-full flex-wrap items-center gap-3">
+            <p className="text-muted-foreground">Manage your tenants and organizations</p>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Tenant
+              </Button>
+            </div>
+          </div>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Tenant
-        </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>All Tenants</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>

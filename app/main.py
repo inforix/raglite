@@ -116,13 +116,17 @@ async def health():
 
 
 # Serve UI static files
-ui_dist_path = Path(__file__).parent.parent / "ui" / "dist"
+ui_dist_path = (Path(__file__).parent.parent / "ui" / "dist").resolve()
 if ui_dist_path.exists():
     app.mount("/ui/assets", StaticFiles(directory=str(ui_dist_path / "assets")), name="ui-assets")
     
     @app.get("/ui/{full_path:path}")
     async def serve_ui(full_path: str):
         """Serve the React SPA - all routes return index.html for client-side routing"""
+        if full_path:
+            requested_path = (ui_dist_path / full_path).resolve()
+            if ui_dist_path in requested_path.parents and requested_path.is_file():
+                return FileResponse(str(requested_path))
         index_path = ui_dist_path / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path))

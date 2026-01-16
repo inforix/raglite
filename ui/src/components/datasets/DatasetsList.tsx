@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Plus, Trash2, Edit, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useDatasets, useDeleteDataset } from '@/hooks/useDatasets';
 import { useTenants } from '@/hooks/useTenants';
@@ -57,52 +57,41 @@ export function DatasetsList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="w-full">
           <h1 className="text-3xl font-bold">Datasets</h1>
-          <p className="text-muted-foreground mt-2">
-            Manage your datasets and collections
-          </p>
+          <div className="mt-2 flex w-full flex-wrap items-center gap-3">
+            <p className="text-muted-foreground">Manage your datasets and collections</p>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Label htmlFor="tenant-select" className="text-xs text-muted-foreground">Tenant</Label>
+                <select
+                  id="tenant-select"
+                  className="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedTenantId}
+                  onChange={(e) => setSelectedTenantId(e.target.value)}
+                >
+                  <option value="">All Tenants</option>
+                  {tenants?.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Button variant="outline" size="icon" onClick={() => refetch?.()}>
+                <RotateCw className="h-4 w-4" />
+              </Button>
+              <Button onClick={handleCreate}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create Dataset
+              </Button>
+            </div>
+          </div>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Dataset
-        </Button>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Filter by Tenant</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-4 items-end">
-            <div className="flex-1">
-              <Label htmlFor="tenant-select">Select Tenant</Label>
-              <select
-                id="tenant-select"
-                className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                value={selectedTenantId}
-                onChange={(e) => setSelectedTenantId(e.target.value)}
-              >
-                <option value="">All Tenants</option>
-                {tenants?.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0">
-          <CardTitle>All Datasets</CardTitle>
-          <Button variant="ghost" size="icon" onClick={() => refetch?.()}>
-            <RotateCw className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="px-0">
           {isLoading ? (
             <div className="text-center py-12">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto"></div>

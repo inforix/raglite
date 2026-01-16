@@ -1,14 +1,15 @@
 import { useCallback, useState } from 'react';
 import type { DragEvent } from 'react';
-import { Trash2, Upload, FileText, RefreshCw } from 'lucide-react';
+import { Trash2, Upload, FileText, RefreshCw, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useDocuments, useDeleteDocument, useUploadDocument } from '@/hooks/useDocuments';
+import { useDocuments, useDeleteDocument, useUpdateDocument, useUploadDocument } from '@/hooks/useDocuments';
 import { useDatasets } from '@/hooks/useDatasets';
 import { useTenants } from '@/hooks/useTenants';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
+import type { Document } from '@/types/document';
 import {
   Dialog,
   DialogContent,
@@ -24,12 +25,16 @@ export function DocumentsList() {
   const [uploadFiles, setUploadFiles] = useState<FileList | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const [renameDocument, setRenameDocument] = useState<Document | null>(null);
+  const [renameFilename, setRenameFilename] = useState('');
   
   const { data: tenants } = useTenants();
   const { data: datasets } = useDatasets(selectedTenantId || undefined);
   const { data: documents, isLoading, isFetching, refetch } = useDocuments(selectedDatasetId || undefined);
   const deleteDocument = useDeleteDocument();
   const uploadDocument = useUploadDocument();
+  const updateDocument = useUpdateDocument();
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this document?')) {
@@ -54,6 +59,26 @@ export function DocumentsList() {
     setIsUploadOpen(false);
   };
 
+  const handleRenameStart = (doc: Document) => {
+    setRenameDocument(doc);
+    setRenameFilename(doc.filename || '');
+    setIsRenameOpen(true);
+  };
+
+  const handleRename = async () => {
+    if (!renameDocument) return;
+    const trimmed = renameFilename.trim();
+    if (!trimmed) return;
+    await updateDocument.mutateAsync({
+      id: renameDocument.id,
+      filename: trimmed,
+      datasetId: renameDocument.dataset_id,
+    });
+    setIsRenameOpen(false);
+    setRenameDocument(null);
+    setRenameFilename('');
+  };
+
   const handleDrop = useCallback((event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
     setIsDragging(false);
@@ -72,64 +97,47 @@ export function DocumentsList() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <div>
+        <div className="w-full">
           <h1 className="text-3xl font-bold">Documents</h1>
-          <p className="text-muted-foreground mt-2">
-            Upload and manage your documents
-          </p>
-        </div>
-      </div>
+          <div className="mt-2 flex w-full flex-wrap items-center gap-3">
+            <p className="text-muted-foreground">Upload and manage your documents</p>
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Tenant</Label>
+                <select
+                  className="h-9 w-44 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedTenantId}
+                  onChange={(e) => {
+                    setSelectedTenantId(e.target.value);
+                    setSelectedDatasetId('');
+                  }}
+                >
+                  <option value="">Select tenant</option>
+                  {tenants?.map((tenant) => (
+                    <option key={tenant.id} value={tenant.id}>
+                      {tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Select Dataset</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Tenant</Label>
-              <select
-                className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                value={selectedTenantId}
-                onChange={(e) => {
-                  setSelectedTenantId(e.target.value);
-                  setSelectedDatasetId('');
-                }}
-              >
-                <option value="">Select tenant</option>
-                {tenants?.map((tenant) => (
-                  <option key={tenant.id} value={tenant.id}>
-                    {tenant.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+              <div className="flex items-center gap-2">
+                <Label className="text-xs text-muted-foreground">Dataset</Label>
+                <select
+                  className="h-9 w-48 rounded-md border border-input bg-background px-3 text-sm"
+                  value={selectedDatasetId}
+                  onChange={(e) => setSelectedDatasetId(e.target.value)}
+                  disabled={!selectedTenantId}
+                >
+                  <option value="">Select dataset</option>
+                  {datasets?.map((dataset) => (
+                    <option key={dataset.id} value={dataset.id}>
+                      {dataset.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            <div className="space-y-2">
-              <Label>Dataset</Label>
-              <select
-                className="w-full h-10 px-3 rounded-md border border-input bg-background"
-                value={selectedDatasetId}
-                onChange={(e) => setSelectedDatasetId(e.target.value)}
-                disabled={!selectedTenantId}
-              >
-                <option value="">Select dataset</option>
-                {datasets?.map((dataset) => (
-                  <option key={dataset.id} value={dataset.id}>
-                    {dataset.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between gap-2">
-            <CardTitle>Documents</CardTitle>
-            <div className="flex items-center gap-2">
               <Button
                 variant="outline"
                 size="icon"
@@ -149,8 +157,12 @@ export function DocumentsList() {
               </Button>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
+        </div>
+      </div>
+
+      <Card>
+        
+        <CardContent className="px-0">
           {!selectedDatasetId ? (
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
@@ -186,11 +198,11 @@ export function DocumentsList() {
                     <TableCell>
                       <span
                         className={`inline-block px-2 py-1 rounded text-xs ${
-                          doc.status === 'completed'
+                          doc.status === 'completed' || doc.status === 'succeeded' || doc.status === 'success'
                             ? 'bg-green-100 text-green-800'
                           : doc.status === 'processing'
                             ? 'bg-blue-100 text-blue-800'
-                          : doc.status === 'failed'
+                            : doc.status === 'failed'
                             ? 'bg-red-100 text-red-800'
                             : 'bg-gray-100 text-gray-800'
                         }`}
@@ -204,13 +216,24 @@ export function DocumentsList() {
                         : '-'}
                     </TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(doc.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRenameStart(doc)}
+                          title="Rename"
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(doc.id)}
+                          title="Delete"
+                        >
+                          <Trash2 className="h-4 w-4 text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -270,6 +293,48 @@ export function DocumentsList() {
               disabled={!uploadFiles || uploadFiles.length === 0 || uploadDocument.isPending || !selectedDatasetId}
             >
               {uploadDocument.isPending ? 'Uploading...' : 'Start upload'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isRenameOpen}
+        onOpenChange={(open) => {
+          setIsRenameOpen(open);
+          if (!open) {
+            setRenameDocument(null);
+            setRenameFilename('');
+          }
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename document</DialogTitle>
+            <DialogDescription>
+              Update the filename for this document.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="rename-filename">Filename</Label>
+            <Input
+              id="rename-filename"
+              value={renameFilename}
+              onChange={(e) => setRenameFilename(e.target.value)}
+              placeholder="Enter a filename"
+            />
+          </div>
+          <DialogFooter className="mt-2">
+            <Button
+              onClick={handleRename}
+              disabled={
+                !renameDocument ||
+                updateDocument.isPending ||
+                renameFilename.trim().length === 0 ||
+                renameFilename.trim() === (renameDocument?.filename || '')
+              }
+            >
+              {updateDocument.isPending ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>
