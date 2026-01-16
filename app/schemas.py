@@ -82,6 +82,7 @@ class QueryRequest(BaseModel):
     k: conint(gt=0, le=50) = 5
     rewrite: bool = True
     filters: Optional[dict] = None
+    min_score: Optional[float] = None
 
 
 class QueryHit(BaseModel):

@@ -405,6 +405,11 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
                 "meta": payload.get("meta"),
             }
     merged_list = sorted(merged.values(), key=lambda x: x.get("score", 0), reverse=True)[: request.k]
+    min_score = request.min_score
+    if min_score is None:
+        min_score = settings.query_min_score
+    if min_score is not None:
+        merged_list = [hit for hit in merged_list if hit.get("score", 0) >= min_score]
     reranked = reranker.rerank(qtext, merged_list)
     return QueryResponse(query=request.query, rewritten=rewritten, results=reranked)
 

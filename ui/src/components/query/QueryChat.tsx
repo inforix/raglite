@@ -74,7 +74,7 @@ export function QueryChat() {
               const label = data.rewritten && idx === 0 ? '(rewritten)' : '';
               return `• ${r.text.trim()}\n  score: ${r.score.toFixed(3)} | dataset: ${r.dataset_id} | doc: ${r.document_id} ${label}`;
             })
-          : ['No results found.'];
+          : ['No related chunks found.'];
 
       const assistantMessage: Message = {
         role: 'assistant',
