@@ -16,7 +16,7 @@ interface SettingsResponse {
 }
 
 export function useEmbedders() {
-  return useQuery({
+  return useQuery<{ embedders: ModelConfig[]; defaultEmbedder: string }, Error>({
     queryKey: ['embedders'],
     queryFn: async () => {
       const response = await api.get<SettingsResponse>(API_ENDPOINTS.SETTINGS);

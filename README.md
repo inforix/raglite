@@ -38,7 +38,7 @@ git clone https://github.com/inforix/raglite.git
 cd raglite
 
 # Build the UI (first time only)
-cd ui && npm install && npm run build && cd ..
+cd ui && bun install && bun run build && cd ..
 
 # Start all services (Postgres, Qdrant, Redis, OpenSearch, API, Worker)
 docker compose up -d
@@ -173,7 +173,7 @@ class QueryRewriter:
 
 ## Runtime Defaults
 - API listens on port `7615` (override via env).
-- Dev metadata store defaults to SQLite (`sqlite:///./raglite.db`); use Postgres in production.
+- Metadata store defaults to Postgres (`postgresql://raglite:raglite@localhost:5432/raglite`); override with `RAGLITE_POSTGRES_DSN` if needed.
 - Production hardening: set `RAGLITE_ENV=prod`, disable bootstrap keys (`RAGLITE_ENABLE_BOOTSTRAP=false`), set `RAGLITE_ALLOWED_ORIGINS` for CORS, point `RAGLITE_POSTGRES_DSN`/`RAGLITE_REDIS_URL`/`RAGLITE_QDRANT_URL` to production services.
 
 ## Embedding Configuration

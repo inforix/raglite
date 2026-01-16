@@ -148,6 +148,10 @@ data/
 *.txt
 !requirements.txt
 
+# Frontend helpers
+!/ui/src/lib/
+!/ui/src/lib/*
+
 # Logs
 logs/
 *.log

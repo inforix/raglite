@@ -10,13 +10,18 @@ echo ""
 
 cd "$(dirname "$0")/.."
 
+# Load env vars if present
+if [ -f ".env" ]; then
+    set -a
+    . ./.env
+    set +a
+fi
+
+RAGLITE_POSTGRES_DSN=${RAGLITE_POSTGRES_DSN:-postgresql://raglite:raglite@localhost:5432/raglite}
+
 # Step 1: Check database
 echo "📊 Step 1: Checking database..."
-if [ -f "raglite.db" ]; then
-    echo "✅ Database file exists"
-else
-    echo "📝 Creating new database..."
-fi
+echo "✅ Using database: ${RAGLITE_POSTGRES_DSN}"
 
 # Step 2: Run migrations
 echo ""
@@ -32,7 +37,8 @@ uv run python scripts/create_admin_standalone.py
 echo ""
 echo "🎨 Step 4: Rebuilding UI..."
 cd ui
-npm run build 2>&1 | grep -E "(built in|error|warning)" || true
+bun install --frozen-lockfile --save-text-lockfile
+bun run build 2>&1 | grep -E "(built in|error|warning)" || true
 cd ..
 
 # Step 5: Check server

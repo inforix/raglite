@@ -126,4 +126,4 @@ if ui_dist_path.exists():
         index_path = ui_dist_path / "index.html"
         if index_path.exists():
             return FileResponse(str(index_path))
-        return {"error": "UI not built. Run 'cd ui && npm run build'"}
+        return {"error": "UI not built. Run 'cd ui && bun run build'"}

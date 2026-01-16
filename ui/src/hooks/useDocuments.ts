@@ -4,7 +4,7 @@ import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
 import { Document, DocumentListResponse } from '@/types/document';
 
 export function useDocuments(datasetId?: string) {
-  return useQuery({
+  return useQuery<Document[], Error>({
     queryKey: QUERY_KEYS.DOCUMENTS(datasetId),
     queryFn: async () => {
       const params = datasetId ? { dataset_id: datasetId } : {};

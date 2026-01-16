@@ -6,7 +6,7 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.orm import Session
 import uuid
 from datetime import datetime
@@ -15,22 +15,24 @@ from passlib.context import CryptContext
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+DEFAULT_DSN = "postgresql://raglite:raglite@localhost:5432/raglite"
+
+
 def create_admin_user(
-    db_path="sqlite:///./raglite.db",
+    db_path=None,
     email="admin@raglite.local",
     password="admin123",
     name="Admin User"
 ):
     """Create an admin user directly in the database."""
-    
+    if not db_path:
+        db_path = os.getenv("RAGLITE_POSTGRES_DSN", DEFAULT_DSN)
+
     engine = create_engine(db_path)
     
     with Session(engine) as db:
         # Check if users table exists
-        result = db.execute(text(
-            "SELECT name FROM sqlite_master WHERE type='table' AND name='users'"
-        ))
-        if not result.fetchone():
+        if not inspect(engine).has_table("users"):
             print("❌ Users table does not exist. Run migrations first:")
             print("   uv run python -m alembic upgrade head")
             return False

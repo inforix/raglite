@@ -4,7 +4,7 @@ import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
 import { Tenant, CreateTenantRequest, UpdateTenantRequest } from '@/types/tenant';
 
 export function useTenants() {
-  return useQuery({
+  return useQuery<Tenant[], Error>({
     queryKey: QUERY_KEYS.TENANTS,
     queryFn: async () => {
       const response = await api.get<Tenant[]>(API_ENDPOINTS.TENANTS);

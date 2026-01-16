@@ -4,7 +4,7 @@ import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
 import { Dataset, CreateDatasetRequest, UpdateDatasetRequest } from '@/types/dataset';
 
 export function useDatasets(tenantId?: string) {
-  return useQuery({
+  return useQuery<Dataset[], Error>({
     queryKey: QUERY_KEYS.DATASETS(tenantId),
     queryFn: async () => {
       const params = tenantId ? { tenant_id: tenantId } : {};

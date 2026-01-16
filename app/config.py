@@ -45,6 +45,7 @@ class Settings(BaseSettings):
     chunk_overlap: int = 128
     rewrite_cache_ttl_seconds: int = 600
     reranker_model: str | None = None
+    query_min_score: float = 0.5
     rate_limit_per_minute: int = 60
     allowed_origins: List[str] = Field(default_factory=list)
     enable_bm25: bool = True
@@ -56,7 +57,7 @@ class Settings(BaseSettings):
 
     # External services
     redis_url: str = "redis://localhost:6379/0"
-    postgres_dsn: str = "sqlite:///./raglite.db"
+    postgres_dsn: str = "postgresql://raglite:raglite@localhost:5432/raglite"
     qdrant_url: HttpUrl | str = "http://localhost:6333"
     object_store_root: str = "./data"
 
