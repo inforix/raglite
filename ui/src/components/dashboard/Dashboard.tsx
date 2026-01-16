@@ -1,7 +1,40 @@
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Users, Database, FileText, MessageSquare } from 'lucide-react';
+import { useDatasets } from '@/hooks/useDatasets';
+import { useTenants } from '@/hooks/useTenants';
+import { api } from '@/lib/api';
+import { API_ENDPOINTS } from '@/lib/constants';
+import { DocumentListResponse } from '@/types/document';
 
 export function Dashboard() {
+  const tenantsQuery = useTenants();
+  const datasetsQuery = useDatasets();
+  const documentsQuery = useQuery<number, Error>({
+    queryKey: ['documents-count'],
+    queryFn: async () => {
+      const response = await api.get<DocumentListResponse>(API_ENDPOINTS.DOCUMENTS, {
+        params: { page_size: 1 },
+      });
+      return response.data.total;
+    },
+  });
+
+  const formatMetric = (value: number | undefined, isLoading: boolean, isError: boolean) => {
+    if (isLoading) {
+      return '...';
+    }
+    if (isError || value === undefined) {
+      return '-';
+    }
+    return String(value);
+  };
+
+  const tenantsCount = tenantsQuery.data?.length;
+  const datasetsCount = datasetsQuery.data?.length;
+  const documentsCount = documentsQuery.data;
+  const queriesCount = 0;
+
   return (
     <div className="space-y-6">
       <div>
@@ -18,7 +51,9 @@ export function Dashboard() {
             <Users className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {formatMetric(tenantsCount, tenantsQuery.isLoading, !!tenantsQuery.error)}
+            </div>
             <p className="text-xs text-muted-foreground">Total tenants</p>
           </CardContent>
         </Card>
@@ -29,7 +64,9 @@ export function Dashboard() {
             <Database className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {formatMetric(datasetsCount, datasetsQuery.isLoading, !!datasetsQuery.error)}
+            </div>
             <p className="text-xs text-muted-foreground">Total datasets</p>
           </CardContent>
         </Card>
@@ -40,7 +77,9 @@ export function Dashboard() {
             <FileText className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">
+              {formatMetric(documentsCount, documentsQuery.isLoading, !!documentsQuery.error)}
+            </div>
             <p className="text-xs text-muted-foreground">Total documents</p>
           </CardContent>
         </Card>
@@ -51,7 +90,7 @@ export function Dashboard() {
             <MessageSquare className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">-</div>
+            <div className="text-2xl font-bold">{queriesCount}</div>
             <p className="text-xs text-muted-foreground">Recent queries</p>
           </CardContent>
         </Card>
