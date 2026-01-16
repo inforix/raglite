@@ -26,10 +26,31 @@ export function Sidebar() {
       )}
     >
       {/* Logo/Header */}
-      <div className="h-16 flex items-center justify-between px-4 border-b">
+      <div
+        className={cn(
+          'h-16 flex items-center px-4 border-b',
+          sidebarCollapsed ? 'justify-end' : 'justify-between'
+        )}
+      >
         {!sidebarCollapsed && (
           <h1 className="text-xl font-bold">RAGLite</h1>
         )}
+        <TooltipProvider delayDuration={0}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button variant="ghost" size="icon" onClick={toggleSidebar}>
+                {sidebarCollapsed ? (
+                  <ChevronRight className="h-5 w-5" />
+                ) : (
+                  <ChevronLeft className="h-5 w-5" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right">
+              {sidebarCollapsed ? 'Expand' : 'Collapse'}
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
       </div>
 
       {/* Navigation */}
@@ -74,24 +95,6 @@ export function Sidebar() {
         </TooltipProvider>
       </nav>
 
-      {/* Toggle Button */}
-      <div className="p-2 border-t">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={toggleSidebar}
-          className={cn('w-full', !sidebarCollapsed && 'justify-end')}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-5 w-5" />
-          ) : (
-            <>
-              <ChevronLeft className="h-5 w-5" />
-              <span className="ml-2">Collapse</span>
-            </>
-          )}
-        </Button>
-      </div>
     </div>
   );
 }
