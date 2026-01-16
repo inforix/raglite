@@ -209,6 +209,31 @@ def update_tenant(db: Session, tenant_id: str, payload: TenantCreate) -> TenantO
     return TenantOut(id=tenant.id, name=tenant.name, description=tenant.description, api_key=None, created_at=tenant.created_at)
 
 
+def regenerate_tenant_api_key(db: Session, tenant_id: str) -> dict:
+    tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+    db.query(models.ApiKey).filter(
+        models.ApiKey.tenant_id == tenant_id,
+        models.ApiKey.active.is_(True),
+    ).update({models.ApiKey.active: False}, synchronize_session=False)
+
+    api_key_value = str(uuid.uuid4()).replace("-", "")[:64]
+    key_hash = pbkdf2_sha256.hash(api_key_value)
+    api_key = models.ApiKey(
+        id=str(uuid.uuid4()),
+        tenant_id=tenant_id,
+        name=f"regenerated-{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+        key_hash=key_hash,
+        active=True,
+    )
+    db.add(api_key)
+    db.commit()
+    db.refresh(api_key)
+    return {"tenant_id": tenant.id, "api_key": api_key_value, "created_at": api_key.created_at}
+
+
 def delete_tenant(db: Session, tenant_id: str):
     tenant = db.query(models.Tenant).filter(models.Tenant.id == tenant_id).first()
     if not tenant:

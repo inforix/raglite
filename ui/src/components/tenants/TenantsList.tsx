@@ -1,15 +1,16 @@
 import { useState } from 'react';
-import { Plus, Trash2, Edit } from 'lucide-react';
+import { Plus, Trash2, Edit, Key } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useTenants, useDeleteTenant } from '@/hooks/useTenants';
+import { useTenants, useDeleteTenant, useRegenerateTenantKey } from '@/hooks/useTenants';
 import { TenantDialog } from './TenantDialog';
 import { Tenant } from '@/types/tenant';
 
 export function TenantsList() {
   const { data: tenants, isLoading, error } = useTenants();
   const deleteTenant = useDeleteTenant();
+  const regenerateTenantKey = useRegenerateTenantKey();
   const [editingTenant, setEditingTenant] = useState<Tenant | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
@@ -27,6 +28,22 @@ export function TenantsList() {
   const handleCreate = () => {
     setEditingTenant(null);
     setIsDialogOpen(true);
+  };
+
+  const handleRegenerateKey = async (tenant: Tenant) => {
+    const confirmed = confirm(
+      `Regenerate API key for "${tenant.name}"? This will invalidate the old key.`
+    );
+    if (!confirmed) {
+      return;
+    }
+    try {
+      const result = await regenerateTenantKey.mutateAsync(tenant.id);
+      window.prompt('New API key (copy and store it now):', result.api_key);
+    } catch (err) {
+      console.error('Error regenerating API key:', err);
+      alert('Failed to regenerate API key.');
+    }
   };
 
   const handleCloseDialog = () => {
@@ -90,6 +107,15 @@ export function TenantsList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleRegenerateKey(tenant)}
+                          aria-label="Regenerate API key"
+                          title="Regenerate API key"
+                        >
+                          <Key className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

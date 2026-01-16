@@ -8,6 +8,7 @@ export const API_ENDPOINTS = {
   // Tenants
   TENANTS: '/v1/tenants',
   TENANT: (id: string) => `/v1/tenants/${id}`,
+  TENANT_REGENERATE_KEY: (id: string) => `/v1/tenants/${id}/regenerate-key`,
   
   // Datasets
   DATASETS: '/v1/datasets',

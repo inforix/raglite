@@ -26,7 +26,7 @@ from app.schemas import (
     ModelConfigOut,
     ModelConfigUpdate,
 )
-from app.schemas_tenant import TenantCreate, TenantOut
+from app.schemas_tenant import TenantCreate, TenantOut, TenantApiKeyOut
 from app.schemas_auth import LoginRequest, LoginResponse, UserOut
 from app.auth import get_current_user as get_current_user_dep
 from core import answerer, embedder, rewriter, reranker, vectorstore, opensearch_bm25
@@ -171,6 +171,11 @@ async def update_tenant(tenant_id: str, payload: TenantCreate, db: Session = Dep
 async def delete_tenant(tenant_id: str, db: Session = Depends(get_db)):
     services.delete_tenant(db, tenant_id)
     return {}
+
+
+@router.post("/tenants/{tenant_id}/regenerate-key", tags=["tenants"], response_model=TenantApiKeyOut)
+async def regenerate_tenant_key(tenant_id: str, db: Session = Depends(get_db)):
+    return services.regenerate_tenant_api_key(db, tenant_id)
 
 
 @router.post("/datasets", status_code=status.HTTP_201_CREATED, tags=["datasets"], response_model=DatasetOut)

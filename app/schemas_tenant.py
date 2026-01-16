@@ -16,3 +16,9 @@ class TenantOut(BaseModel):
     description: Optional[str] = None
     api_key: Optional[str] = None
     created_at: datetime
+
+
+class TenantApiKeyOut(BaseModel):
+    tenant_id: str
+    api_key: str
+    created_at: datetime

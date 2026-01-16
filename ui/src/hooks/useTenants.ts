@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { API_ENDPOINTS, QUERY_KEYS } from '@/lib/constants';
-import { Tenant, CreateTenantRequest, UpdateTenantRequest } from '@/types/tenant';
+import { Tenant, CreateTenantRequest, UpdateTenantRequest, TenantKeyResponse } from '@/types/tenant';
 
 export function useTenants() {
   return useQuery<Tenant[], Error>({
@@ -51,6 +51,15 @@ export function useDeleteTenant() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.TENANTS });
+    },
+  });
+}
+
+export function useRegenerateTenantKey() {
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.post<TenantKeyResponse>(API_ENDPOINTS.TENANT_REGENERATE_KEY(id));
+      return response.data;
     },
   });
 }

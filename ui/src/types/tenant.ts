@@ -12,3 +12,9 @@ export interface CreateTenantRequest {
 export interface UpdateTenantRequest {
   name: string;
 }
+
+export interface TenantKeyResponse {
+  tenant_id: string;
+  api_key: string;
+  created_at: string;
+}
