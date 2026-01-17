@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     )
     default_chat_model: str = "gpt-4o-mini"
     allowed_chat_models: List[str] = Field(default_factory=lambda: ["gpt-4o-mini", "gpt-3.5-turbo"])
+    default_rerank_model: Optional[str] = None
+    allowed_rerank_models: List[str] = Field(default_factory=list)
 
     # Ingestion limits
     max_files_per_upload: int = 10
@@ -44,7 +46,6 @@ class Settings(BaseSettings):
     chunk_size: int = 512
     chunk_overlap: int = 128
     rewrite_cache_ttl_seconds: int = 600
-    reranker_model: str | None = None
     query_min_score: float = 0.5
     rate_limit_per_minute: int = 60
     allowed_origins: List[str] = Field(default_factory=list)

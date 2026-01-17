@@ -3,6 +3,7 @@ export const API_ENDPOINTS = {
   LOGIN: '/v1/auth/login',
   LOGOUT: '/v1/auth/logout',
   ME: '/v1/auth/me',
+  PROFILE: '/v1/auth/profile',
   REFRESH: '/v1/auth/refresh',
   
   // Tenants
@@ -31,6 +32,8 @@ export const API_ENDPOINTS = {
   SETTINGS_EMBEDDER: (id: string) => `/v1/settings/embedders/${id}`,
   SETTINGS_CHAT_MODELS: '/v1/settings/chat-models',
   SETTINGS_CHAT_MODEL: (id: string) => `/v1/settings/chat-models/${id}`,
+  SETTINGS_RERANK_MODELS: '/v1/settings/rerank-models',
+  SETTINGS_RERANK_MODEL: (id: string) => `/v1/settings/rerank-models/${id}`,
 };
 
 export const QUERY_KEYS = {

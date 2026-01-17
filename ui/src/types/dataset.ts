@@ -3,6 +3,10 @@ export interface Dataset {
   tenant_id: string;
   name: string;
   embedder?: string;
+  rerank_enabled?: boolean;
+  rerank_model?: string | null;
+  rerank_top_k?: number | null;
+  rerank_min_score?: number | null;
   description?: string;
   language?: string;
   created_at?: string;
@@ -14,6 +18,10 @@ export interface CreateDatasetRequest {
   tenant_id: string;
   name: string;
   embedder: string;
+  rerank_enabled?: boolean;
+  rerank_model?: string | null;
+  rerank_top_k?: number | null;
+  rerank_min_score?: number | null;
   description?: string;
   language?: string;
 }
@@ -21,6 +29,10 @@ export interface CreateDatasetRequest {
 export interface UpdateDatasetRequest {
   name?: string;
   embedder?: string;
+  rerank_enabled?: boolean;
+  rerank_model?: string | null;
+  rerank_top_k?: number | null;
+  rerank_min_score?: number | null;
   description?: string;
   confirm_embedder_change?: boolean;
   language?: string;

@@ -24,6 +24,8 @@ interface Message {
   content: string;
   sources?: SourceItem[];
   rewritten?: string;
+  rerankApplied?: boolean;
+  rerankModel?: string | null;
 }
 
 export function QueryChat() {
@@ -146,6 +148,8 @@ export function QueryChat() {
         query: string;
         rewritten?: string;
         answer?: string;
+        rerank_applied?: boolean;
+        rerank_model?: string | null;
         results: Array<{
           text: string;
           score: number;
@@ -174,6 +178,8 @@ export function QueryChat() {
           meta: r.meta ?? null,
         })),
         rewritten: data.rewritten,
+        rerankApplied: data.rerank_applied,
+        rerankModel: data.rerank_model ?? undefined,
       };
       setMessages((prev) => [...prev, assistantMessage]);
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.QUERIES_COUNT });
@@ -283,6 +289,25 @@ export function QueryChat() {
                           <p className="uppercase tracking-wide text-[11px] font-semibold">
                             Sources
                           </p>
+                          {typeof message.rerankApplied === 'boolean' && (
+                            <div className="flex flex-wrap items-center gap-2 text-[11px] uppercase tracking-wide">
+                              <span className="font-semibold text-foreground">Rerank</span>
+                              <span
+                                className={
+                                  message.rerankApplied
+                                    ? 'text-emerald-600'
+                                    : 'text-muted-foreground'
+                                }
+                              >
+                                {message.rerankApplied ? 'on' : 'off'}
+                              </span>
+                              {message.rerankApplied && message.rerankModel && (
+                                <span className="text-muted-foreground normal-case">
+                                  ({message.rerankModel})
+                                </span>
+                              )}
+                            </div>
+                          )}
                           <div className="grid gap-2">
                             {message.sources.map((source, sourceIndex) => (
                               <div

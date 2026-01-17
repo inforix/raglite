@@ -184,10 +184,14 @@ class QueryRewriter:
 - Administrator sets an allowed embedder list (model id + dimension); default `sentence-transformers/all-MiniLM-L6-v2`.
 - Tenants select embedder at tenant or dataset level from the allowed list; reindex required when changing.
 
+## Rerank Configuration
+- Administrator configures rerank models (endpoint + API key + model id) and an optional default.
+- Datasets can enable rerank and optionally select a rerank model; default rerank model is used when none is specified.
+
 ## Minimal Tech Choices
 - Python 3.12+, FastAPI, SQLAlchemy, Pydantic, Celery + Redis, Postgres, Qdrant (or pgvector).
 - Embedding defaults: `sentence-transformers/all-MiniLM-L6-v2` (local download) with batching.
-- Rerank (optional): `cross-encoder/ms-marco-MiniLM-L-2-v2` (set `RAGLITE_RERANKER_MODEL`).
+- Rerank (optional): configured in Settings with OpenAI-compatible rerank endpoints (e.g., Cohere /v1/rerank).
 - Docker Compose for local: api + worker + redis + qdrant + postgres.
 - Limits: max 10 files per upload, 25 MB each; allowed MIME: txt/md/html/pdf; parse timeout 10s before offloading.
 - Dev setup: use `uv` for dependency management (`pyproject.toml`); `uv sync` to install, `uv run uvicorn app.main:app --reload --port 7615`; `uv run celery -A workers.worker.celery_app worker --loglevel=info` for workers. `sentence-transformers` may take longer to install (retry with longer timeout); HTML parsing uses BeautifulSoup, PDF via pypdf.
@@ -206,7 +210,7 @@ def query(payload: QueryRequest, tenant=Depends(auth)):
     rewritten = rewriter.rewrite(tenant.id, payload.query) if payload.rewrite else payload.query
     qvec = embedder.embed([rewritten])[0]
     hits = vector_store.query(tenant.id, payload.dataset_ids, qvec, k=payload.k, filters=payload.filters)
-    reranked = reranker.rerank(rewritten, hits) if reranker else hits
+    reranked = reranker.rerank(rewritten, hits)  # dataset config decides whether rerank applies
     return {"query": payload.query, "rewritten": rewritten, "results": reranked}
 ```
 

@@ -1,6 +1,9 @@
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Users, Database, FileText, MessageSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Users, Database, FileText, MessageSquare, X } from 'lucide-react';
+import { useAuthStore } from '@/stores/authStore';
 import { useDatasets } from '@/hooks/useDatasets';
 import { useTenants } from '@/hooks/useTenants';
 import { api } from '@/lib/api';
@@ -9,6 +12,8 @@ import { DocumentListResponse } from '@/types/document';
 import { QueryHistoryResponse, QueryDailyStatsResponse } from '@/types/query';
 
 export function Dashboard() {
+  const { user, token, setAuth } = useAuthStore();
+  const [showQuickStart, setShowQuickStart] = useState(true);
   const tenantsQuery = useTenants();
   const datasetsQuery = useDatasets();
   const documentsQuery = useQuery<number, Error>({
@@ -48,6 +53,10 @@ export function Dashboard() {
     }
     return String(value);
   };
+
+  useEffect(() => {
+    setShowQuickStart(user?.profile?.show_quick_start ?? true);
+  }, [user?.profile?.show_quick_start]);
 
   const tenantsCount = tenantsQuery.data?.length;
   const datasetsCount = datasetsQuery.data?.length;
@@ -221,37 +230,57 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Quick Start</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <h3 className="font-medium">1. Create a Tenant</h3>
-            <p className="text-sm text-muted-foreground">
-              Start by creating a tenant to organize your data
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium">2. Add a Dataset</h3>
-            <p className="text-sm text-muted-foreground">
-              Create datasets within your tenant to group related documents
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium">3. Upload Documents</h3>
-            <p className="text-sm text-muted-foreground">
-              Upload documents to your datasets for indexing
-            </p>
-          </div>
-          <div>
-            <h3 className="font-medium">4. Query Your Data</h3>
-            <p className="text-sm text-muted-foreground">
-              Use the Query Chat to ask questions about your documents
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      {showQuickStart && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Quick Start</CardTitle>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Hide Quick Start"
+              onClick={async () => {
+                setShowQuickStart(false);
+                try {
+                  const response = await api.put(API_ENDPOINTS.PROFILE, { show_quick_start: false });
+                  if (user && token) {
+                    setAuth({ ...user, profile: response.data }, token);
+                  }
+                } catch (error) {
+                  setShowQuickStart(true);
+                }
+              }}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <h3 className="font-medium">1. Create a Tenant</h3>
+              <p className="text-sm text-muted-foreground">
+                Start by creating a tenant to organize your data
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium">2. Add a Dataset</h3>
+              <p className="text-sm text-muted-foreground">
+                Create datasets within your tenant to group related documents
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium">3. Upload Documents</h3>
+              <p className="text-sm text-muted-foreground">
+                Upload documents to your datasets for indexing
+              </p>
+            </div>
+            <div>
+              <h3 className="font-medium">4. Query Your Data</h3>
+              <p className="text-sm text-muted-foreground">
+                Use the Query Chat to ask questions about your documents
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
