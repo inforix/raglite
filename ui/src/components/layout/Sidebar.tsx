@@ -1,5 +1,5 @@
 import { Link, useLocation } from 'react-router-dom';
-import { Home, MessageSquare, Users, Database, FileText, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Home, MessageSquare, Users, Database, FileText, Settings, ChevronLeft, ChevronRight, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useUIStore } from '@/stores/uiStore';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ const menuItems = [
   { icon: Database, label: 'Datasets', path: '/ui/datasets' },
   { icon: FileText, label: 'Documents', path: '/ui/documents' },
   { icon: Settings, label: 'Settings', path: '/ui/settings' },
+  { icon: Info, label: 'About', path: '/ui/about' },
 ];
 
 export function Sidebar() {

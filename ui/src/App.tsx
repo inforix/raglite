@@ -9,6 +9,7 @@ import { DatasetsList } from './components/datasets/DatasetsList';
 import { DocumentsList } from './components/documents/DocumentsList';
 import { QueryChat } from './components/query/QueryChat';
 import { SettingsPage } from './components/settings/SettingsPage';
+import { AboutPage } from './components/about/AboutPage';
 import './index.css';
 
 const queryClient = new QueryClient({
@@ -40,6 +41,7 @@ function App() {
             <Route path="documents" element={<DocumentsList />} />
             <Route path="query" element={<QueryChat />} />
             <Route path="settings" element={<SettingsPage />} />
+            <Route path="about" element={<AboutPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/ui" replace />} />
         </Routes>
