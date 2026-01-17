@@ -2,7 +2,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
+from sqlalchemy import JSON, Boolean, Column, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, Float
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from infra.db import Base
@@ -73,6 +73,10 @@ class Dataset(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     embedder: Mapped[str | None] = mapped_column(String, nullable=True)
+    rerank_enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    rerank_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    rerank_top_k: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rerank_min_score: Mapped[float | None] = mapped_column(Float, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
@@ -146,6 +150,7 @@ class AppSettings(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True, default=_uuid)
     default_embedder: Mapped[str] = mapped_column(String, nullable=False)
     default_chat_model: Mapped[str] = mapped_column(String, nullable=False)
+    default_rerank_model: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -153,6 +158,7 @@ class AppSettings(Base):
 class ModelType(str, Enum):
     embedder = "embedder"
     chat = "chat"
+    rerank = "rerank"
 
 
 class ModelConfig(Base):

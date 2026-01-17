@@ -44,6 +44,19 @@ def seed_model_configs_from_settings(db: Session) -> None:
                 updated_at=now,
             )
         )
+    for name in cfg.allowed_rerank_models:
+        seed_rows.append(
+            models.ModelConfig(
+                id=str(uuid.uuid4()),
+                name=name,
+                type=models.ModelType.rerank.value,
+                endpoint="",
+                api_key=None,
+                model=name,
+                created_at=now,
+                updated_at=now,
+            )
+        )
     if seed_rows:
         db.add_all(seed_rows)
         db.commit()
@@ -82,6 +95,7 @@ def ensure_settings_defaults(db: Session, settings_row: Optional[models.AppSetti
 
     allowed_embedders = get_allowed_model_names(db, models.ModelType.embedder)
     allowed_chat_models = get_allowed_model_names(db, models.ModelType.chat)
+    allowed_rerank_models = get_allowed_model_names(db, models.ModelType.rerank)
     changed = False
 
     if allowed_embedders and settings_obj.default_embedder not in allowed_embedders:
@@ -89,6 +103,9 @@ def ensure_settings_defaults(db: Session, settings_row: Optional[models.AppSetti
         changed = True
     if allowed_chat_models and settings_obj.default_chat_model not in allowed_chat_models:
         settings_obj.default_chat_model = allowed_chat_models[0]
+        changed = True
+    if settings_obj.default_rerank_model and settings_obj.default_rerank_model not in allowed_rerank_models:
+        settings_obj.default_rerank_model = None
         changed = True
 
     if changed:
@@ -105,6 +122,7 @@ def get_app_settings_db(db: Session) -> models.AppSettings:
             id=str(uuid.uuid4()),
             default_embedder=cfg.default_embedder,
             default_chat_model=cfg.default_chat_model,
+            default_rerank_model=cfg.default_rerank_model,
         )
         db.add(settings_row)
         db.commit()
@@ -112,12 +130,20 @@ def get_app_settings_db(db: Session) -> models.AppSettings:
     return ensure_settings_defaults(db, settings_row)
 
 
-def update_app_settings_db(db: Session, default_embedder: str | None, default_chat_model: str | None) -> models.AppSettings:
+def update_app_settings_db(
+    db: Session,
+    default_embedder: str | None,
+    default_chat_model: str | None,
+    default_rerank_model: str | None = None,
+    update_rerank: bool = False,
+) -> models.AppSettings:
     settings_row = get_app_settings_db(db)
     if default_embedder:
         settings_row.default_embedder = default_embedder
     if default_chat_model:
         settings_row.default_chat_model = default_chat_model
+    if update_rerank:
+        settings_row.default_rerank_model = default_rerank_model
     db.commit()
     db.refresh(settings_row)
     return settings_row
@@ -207,9 +233,13 @@ def update_model_config(db: Session, model_id: str, model_type: models.ModelType
             db.query(models.Dataset).filter(models.Dataset.embedder == old_name).update({"embedder": new_name})
             if settings_row.default_embedder == old_name:
                 settings_row.default_embedder = new_name
-        else:
+        elif model_type == models.ModelType.chat:
             if settings_row.default_chat_model == old_name:
                 settings_row.default_chat_model = new_name
+        elif model_type == models.ModelType.rerank:
+            db.query(models.Dataset).filter(models.Dataset.rerank_model == old_name).update({"rerank_model": new_name})
+            if settings_row.default_rerank_model == old_name:
+                settings_row.default_rerank_model = new_name
 
     mc.updated_at = datetime.utcnow()
     db.commit()
@@ -245,11 +275,27 @@ def delete_model_config(db: Session, model_id: str, model_type: models.ModelType
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Update the default embedder before deleting this entry.",
             )
-    else:
+    elif model_type == models.ModelType.chat:
         if settings_row.default_chat_model == mc.name:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Update the default chat model before deleting this entry.",
+            )
+    elif model_type == models.ModelType.rerank:
+        in_use = (
+            db.query(models.Dataset)
+            .filter(models.Dataset.rerank_model == mc.name, models.Dataset.deleted_at.is_(None))
+            .first()
+        )
+        if in_use:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rerank model is in use by datasets. Reassign them before deleting.",
+            )
+        if settings_row.default_rerank_model == mc.name:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Update the default rerank model before deleting this entry.",
             )
 
     db.delete(mc)

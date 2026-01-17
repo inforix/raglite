@@ -19,6 +19,10 @@ class DatasetCreate(BaseModel):
     name: str
     description: Optional[str] = None
     embedder: str
+    rerank_enabled: bool = False
+    rerank_model: Optional[str] = None
+    rerank_top_k: Optional[conint(gt=0, le=200)] = None
+    rerank_min_score: Optional[float] = Field(default=None, ge=0, le=1)
 
 
 class DatasetUpdate(BaseModel):
@@ -26,6 +30,10 @@ class DatasetUpdate(BaseModel):
     description: Optional[str] = None
     embedder: Optional[str] = None
     confirm_embedder_change: bool = False
+    rerank_enabled: Optional[bool] = None
+    rerank_model: Optional[str] = None
+    rerank_top_k: Optional[conint(gt=0, le=200)] = None
+    rerank_min_score: Optional[float] = Field(default=None, ge=0, le=1)
 
 
 class DatasetOut(BaseModel):
@@ -35,6 +43,10 @@ class DatasetOut(BaseModel):
     name: str
     description: Optional[str] = None
     embedder: Optional[str] = None
+    rerank_enabled: bool = False
+    rerank_model: Optional[str] = None
+    rerank_top_k: Optional[int] = None
+    rerank_min_score: Optional[float] = None
     created_at: datetime
 
 
@@ -102,6 +114,8 @@ class QueryResponse(BaseModel):
     rewritten: Optional[str] = None
     results: List[QueryHit] = Field(default_factory=list)
     answer: Optional[str] = None
+    rerank_applied: bool = False
+    rerank_model: Optional[str] = None
 
 
 class QueryHistoryItem(BaseModel):
@@ -156,10 +170,13 @@ class ModelConfigUpdate(BaseModel):
 class SettingsOut(BaseModel):
     default_embedder: str
     default_chat_model: str
+    default_rerank_model: Optional[str] = None
     embedders: List[ModelConfigOut]
     chat_models: List[ModelConfigOut]
+    rerank_models: List[ModelConfigOut]
 
 
 class SettingsUpdate(BaseModel):
     default_embedder: Optional[str] = None
     default_chat_model: Optional[str] = None
+    default_rerank_model: Optional[str] = None

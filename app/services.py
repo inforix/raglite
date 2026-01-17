@@ -27,12 +27,32 @@ def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> Datas
     allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
     if embedder_name not in allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
+    app_settings = get_app_settings_db(db)
+    rerank_model = (payload.rerank_model or "").strip() or None
+    if rerank_model:
+        allowed_rerank_models = get_allowed_model_names(db, ModelType.rerank)
+        if rerank_model not in allowed_rerank_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rerank model not allowed")
+    if payload.rerank_enabled:
+        effective_rerank = rerank_model or app_settings.default_rerank_model
+        if not effective_rerank:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rerank model is required when rerank is enabled.",
+            )
+        allowed_rerank_models = get_allowed_model_names(db, ModelType.rerank)
+        if effective_rerank not in allowed_rerank_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rerank model not allowed")
     ds = models.Dataset(
         id=str(uuid.uuid4()),
         tenant_id=tenant_id,
         name=payload.name,
         description=payload.description,
         embedder=embedder_name,
+        rerank_enabled=payload.rerank_enabled,
+        rerank_model=rerank_model,
+        rerank_top_k=payload.rerank_top_k,
+        rerank_min_score=payload.rerank_min_score,
     )
     db.add(ds)
     db.commit()
@@ -43,6 +63,10 @@ def create_dataset(db: Session, tenant_id: str, payload: DatasetCreate) -> Datas
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        rerank_enabled=ds.rerank_enabled,
+        rerank_model=ds.rerank_model,
+        rerank_top_k=ds.rerank_top_k,
+        rerank_min_score=ds.rerank_min_score,
         created_at=ds.created_at,
     )
 
@@ -56,6 +80,10 @@ def list_datasets(db: Session, tenant_id: str) -> List[DatasetOut]:
             name=r.name,
             description=r.description,
             embedder=r.embedder,
+            rerank_enabled=r.rerank_enabled,
+            rerank_model=r.rerank_model,
+            rerank_top_k=r.rerank_top_k,
+            rerank_min_score=r.rerank_min_score,
             created_at=r.created_at,
         )
         for r in rows
@@ -81,6 +109,10 @@ def get_dataset(db: Session, tenant_id: str, dataset_id: str) -> DatasetOut:
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        rerank_enabled=ds.rerank_enabled,
+        rerank_model=ds.rerank_model,
+        rerank_top_k=ds.rerank_top_k,
+        rerank_min_score=ds.rerank_min_score,
         created_at=ds.created_at,
     )
 
@@ -120,6 +152,31 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
             embedder_changed = True
     elif not ds.embedder:
         ds.embedder = app_settings.default_embedder
+
+    if payload.rerank_model is not None:
+        rerank_model = payload.rerank_model.strip() or None
+        if rerank_model:
+            allowed_rerank_models = get_allowed_model_names(db, ModelType.rerank)
+            if rerank_model not in allowed_rerank_models:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rerank model not allowed")
+        ds.rerank_model = rerank_model
+    if payload.rerank_enabled is not None:
+        ds.rerank_enabled = payload.rerank_enabled
+    if payload.rerank_top_k is not None:
+        ds.rerank_top_k = payload.rerank_top_k
+    if payload.rerank_min_score is not None:
+        ds.rerank_min_score = payload.rerank_min_score
+
+    if ds.rerank_enabled:
+        effective_rerank = ds.rerank_model or app_settings.default_rerank_model
+        if not effective_rerank:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Rerank model is required when rerank is enabled.",
+            )
+        allowed_rerank_models = get_allowed_model_names(db, ModelType.rerank)
+        if effective_rerank not in allowed_rerank_models:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rerank model not allowed")
     
     db.commit()
     db.refresh(ds)
@@ -132,6 +189,10 @@ def update_dataset(db: Session, tenant_id: str, dataset_id: str, payload: Datase
         name=ds.name,
         description=ds.description,
         embedder=ds.embedder,
+        rerank_enabled=ds.rerank_enabled,
+        rerank_model=ds.rerank_model,
+        rerank_top_k=ds.rerank_top_k,
+        rerank_min_score=ds.rerank_min_score,
         created_at=ds.created_at,
     )
 

@@ -5,8 +5,9 @@
 - Scope: API-only, multi-tenant RAG pipeline (ingest/convert/chunk/embed/store; query rewrite; retrieval + optional rerank). No web UI.
 - Tenancy: API key → tenant; all DB/vector/object operations scoped by tenant; per-tenant collection/prefixes.
 - Components: FastAPI service; worker (Celery + Redis) for ingestion/embedding/indexing; Postgres metadata; object store (local/S3); vector store default Qdrant (Milvus optional, pgvector fallback); Redis for queues/cache.
-- Data model: tenant, dataset, document, chunk, job, user/api_key (minimal).
+- Data model: tenant, dataset (embedder + rerank config), document, chunk, job, user/api_key (minimal), model configs (embedder/chat/rerank), app settings (default embedder/chat/rerank).
 - Embedding config: default model `all-MiniLM-L6-v2`; administrator defines allowed models; tenants can select per-tenant or per-dataset embedder from the allowed list (stored with dataset settings); reindex job required on change.
+- Rerank config: administrator defines allowed rerank models and optional default; datasets can enable rerank and optionally choose a rerank model (fallbacks to default).
 - Runtime: API listens on port 7615 by default; worker queue uses Redis; configuration via environment with sensible defaults.
 - Pipeline: upload/register (supports multiple documents per request) → immediate parse/extract text per file → chunk → embed (batch) → upsert to vector store (tenant + dataset filter) → mark job progress.
 - Query: optional rewrite → embed query → vector search (filters: dataset_ids, metadata) → optional hybrid BM25 → optional rerank → return chunks with provenance; log query for metrics.
@@ -20,8 +21,10 @@
   - GET /v1/query/stats/daily?days=14 (daily query counts)
   - POST /v1/reindex, DELETE /v1/datasets/{id}
   - DELETE /v1/documents/{id} (soft delete + cleanup job)
+  - GET/PUT /v1/settings (defaults, model configs)
+  - POST/PUT/DELETE /v1/settings/embedders, /v1/settings/chat-models, /v1/settings/rerank-models
 - Non-goals (v0.1): UI, chat orchestration, eval suite, billing, ACL beyond tenant key.
-- Decisions (v0.1): Celery + Redis for workers; chunker default 512 tokens with 128 overlap (fallback char chunker 1500/200); embedder `sentence-transformers/all-MiniLM-L6-v2`; rewriter heuristic stub (LLM-pluggable); reranker optional `cross-encoder/ms-marco-MiniLM-L-2-v2`; OAS 3.1 served at root `/`.
+- Decisions (v0.1): Celery + Redis for workers; chunker default 512 tokens with 128 overlap (fallback char chunker 1500/200); embedder `sentence-transformers/all-MiniLM-L6-v2`; rewriter heuristic stub (LLM-pluggable); reranker optional (Cohere-compatible /v1/rerank or local cross-encoder); OAS 3.1 served at root `/`.
 - Constraints: every model includes `tenant_id` and enforces tenant predicates; vector collections are per-tenant; object store paths prefixed by tenant; API returns provenance (dataset_id, document_id, chunk_id, source_uri).
 
 Operational details:

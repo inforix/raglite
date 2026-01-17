@@ -57,11 +57,14 @@ async def get_settings_endpoint(db: Session = Depends(get_db), current_user: Use
     app_settings = get_app_settings_db(db)
     embedders = get_model_configs(db, ModelType.embedder)
     chat_models = get_model_configs(db, ModelType.chat)
+    rerank_models = get_model_configs(db, ModelType.rerank)
     return SettingsOut(
         default_embedder=app_settings.default_embedder,
         default_chat_model=app_settings.default_chat_model,
+        default_rerank_model=app_settings.default_rerank_model,
         embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in embedders],
         chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in chat_models],
+        rerank_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in rerank_models],
     )
 
 
@@ -73,17 +76,49 @@ async def update_settings_endpoint(
 ) -> SettingsOut:
     allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
     allowed_chat_models = get_allowed_model_names(db, ModelType.chat)
+    allowed_rerank_models = get_allowed_model_names(db, ModelType.rerank)
 
     if payload.default_embedder and payload.default_embedder not in allowed_embedders:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Embedder not allowed")
     if payload.default_chat_model and payload.default_chat_model not in allowed_chat_models:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Chat model not allowed")
-    updated = update_app_settings_db(db, payload.default_embedder, payload.default_chat_model)
+    update_rerank = False
+    target_rerank = None
+    if payload.default_rerank_model is not None:
+        update_rerank = True
+        if payload.default_rerank_model != "":
+            if payload.default_rerank_model not in allowed_rerank_models:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Rerank model not allowed")
+            target_rerank = payload.default_rerank_model
+        else:
+            needs_default = (
+                db.query(models.Dataset)
+                .filter(
+                    models.Dataset.rerank_enabled.is_(True),
+                    models.Dataset.rerank_model.is_(None),
+                    models.Dataset.deleted_at.is_(None),
+                )
+                .first()
+            )
+            if needs_default:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Cannot clear default rerank model while datasets rely on it.",
+                )
+    updated = update_app_settings_db(
+        db,
+        payload.default_embedder,
+        payload.default_chat_model,
+        default_rerank_model=target_rerank,
+        update_rerank=update_rerank,
+    )
     return SettingsOut(
         default_embedder=updated.default_embedder,
         default_chat_model=updated.default_chat_model,
+        default_rerank_model=updated.default_rerank_model,
         embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.embedder)],
         chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.chat)],
+        rerank_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.rerank)],
     )
 
 
@@ -146,6 +181,37 @@ async def delete_chat_model(
     current_user: User = Depends(get_current_superuser_dep),
 ):
     delete_model_config(db, model_id, ModelType.chat)
+    return {}
+
+
+@router.post("/settings/rerank-models", tags=["settings"], response_model=ModelConfigOut, status_code=status.HTTP_201_CREATED)
+async def create_rerank_model(
+    payload: ModelConfigCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+) -> ModelConfigOut:
+    mc = create_model_config(db, ModelType.rerank, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.put("/settings/rerank-models/{model_id}", tags=["settings"], response_model=ModelConfigOut)
+async def update_rerank_model(
+    model_id: str,
+    payload: ModelConfigUpdate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+) -> ModelConfigOut:
+    mc = update_model_config(db, model_id, ModelType.rerank, payload)
+    return ModelConfigOut.model_validate(mc, from_attributes=True)
+
+
+@router.delete("/settings/rerank-models/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
+async def delete_rerank_model(
+    model_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+):
+    delete_model_config(db, model_id, ModelType.rerank)
     return {}
 
 
@@ -361,8 +427,12 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
     rewritten = rewriter.rewrite_query(request.query, tenant.tenant_id) if request.rewrite else None
     qtext = rewritten or request.query
     
-    # Use the first dataset's embedder if specified, otherwise default
+    # Use the first dataset's embedder and rerank settings if specified, otherwise default
     query_embedder = None
+    rerank_enabled = False
+    rerank_model = None
+    rerank_top_k = None
+    rerank_min_score = None
     if request.dataset_ids:
         first_ds = db.query(models.Dataset).filter(
             models.Dataset.id == request.dataset_ids[0],
@@ -370,13 +440,21 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
         ).first()
         if first_ds:
             query_embedder = first_ds.embedder
+            rerank_enabled = bool(first_ds.rerank_enabled)
+            rerank_model = first_ds.rerank_model
+            rerank_top_k = first_ds.rerank_top_k
+            rerank_min_score = first_ds.rerank_min_score
     
+    retrieval_k = request.k
+    if rerank_enabled and rerank_top_k:
+        retrieval_k = max(request.k, rerank_top_k)
+
     vector = embedder.embed_texts([qtext], model_name=query_embedder)[0]
     dataset_ids = request.dataset_ids or []
-    results_raw = vs.query(tenant.tenant_id, dataset_ids, vector, k=request.k, filters=request.filters)
+    results_raw = vs.query(tenant.tenant_id, dataset_ids, vector, k=retrieval_k, filters=request.filters)
     bm25_hits = []
     if settings.enable_bm25 and dataset_ids and bm25_client:
-        bm25_hits = bm25_client.search(tenant.tenant_id, dataset_ids, qtext, k=request.k)
+        bm25_hits = bm25_client.search(tenant.tenant_id, dataset_ids, qtext, k=retrieval_k)
     # results_raw expected format: list of dict with payload keys
     results = []
     for hit in results_raw:
@@ -414,13 +492,25 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
                 "source_uri": payload.get("source_uri"),
                 "meta": payload.get("meta"),
             }
-    merged_list = sorted(merged.values(), key=lambda x: x.get("score", 0), reverse=True)[: request.k]
+    merged_list = sorted(merged.values(), key=lambda x: x.get("score", 0), reverse=True)[: retrieval_k]
     min_score = request.min_score
     if min_score is None:
         min_score = settings.query_min_score
     if min_score is not None:
         merged_list = [hit for hit in merged_list if hit.get("score", 0) >= min_score]
-    reranked = reranker.rerank(qtext, merged_list)
+    rerank_applied = False
+    rerank_applied_model = None
+    if rerank_enabled:
+        reranked, rerank_applied, rerank_applied_model = reranker.rerank_with_metadata(
+            qtext,
+            merged_list,
+            model_name=rerank_model,
+            top_k=rerank_top_k,
+            min_score=rerank_min_score,
+        )
+    else:
+        reranked = merged_list
+    reranked = reranked[: request.k]
     answer = None
     if request.answer:
         if request.answer_model:
@@ -432,7 +522,14 @@ async def query(request: QueryRequest, tenant: TenantContext = Depends(get_tenan
         services.log_query(db, tenant.tenant_id, request.query, request.dataset_ids)
     except Exception:
         pass
-    return QueryResponse(query=request.query, rewritten=rewritten, results=reranked, answer=answer)
+    return QueryResponse(
+        query=request.query,
+        rewritten=rewritten,
+        results=reranked,
+        answer=answer,
+        rerank_applied=rerank_applied,
+        rerank_model=rerank_applied_model,
+    )
 
 
 @router.get("/query/history", tags=["query"], response_model=QueryHistoryResponse)
