@@ -1,7 +1,7 @@
 import logging
 import os
 from pathlib import Path
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.openapi.utils import get_openapi
 from fastapi.staticfiles import StaticFiles
@@ -11,7 +11,7 @@ from app.api import api_router
 from app.config import get_settings
 from app.deps import register_api_key
 from infra.db import Base, engine, SessionLocal
-from core import opensearch_bm25
+from core import opensearch_bm25, storage
 from infra import models
 
 settings = get_settings()
@@ -45,7 +45,7 @@ def custom_openapi():
     }
     # Apply security to all protected endpoints
     for path, path_item in openapi_schema["paths"].items():
-        if path == "/health":
+        if path in ["/health", "/health/storage"]:
             continue
         if path == "/v1/tenants" and "post" in path_item:
             continue  # Creating tenant doesn't require auth
@@ -113,6 +113,25 @@ async def bootstrap_api_key():
 @app.get("/health", tags=["meta"])
 async def health():
     return {"status": "ok"}
+
+
+@app.get("/health/storage", tags=["meta"])
+async def storage_health():
+    if not storage.is_s3_backend():
+        return {"backend": "local", "ok": True}
+    try:
+        storage.check_s3_connection()
+    except Exception as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"S3 storage unavailable: {exc}",
+        )
+    return {
+        "backend": "s3",
+        "ok": True,
+        "bucket": settings.s3_bucket,
+        "endpoint": settings.s3_endpoint,
+    }
 
 
 # Serve UI static files

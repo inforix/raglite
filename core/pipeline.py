@@ -3,7 +3,7 @@ import uuid
 from typing import List
 
 from app.config import get_settings
-from core import chunker, embedder as embedder_module, parser, vectorstore
+from core import chunker, embedder as embedder_module, parser, vectorstore, storage
 from core import opensearch_bm25
 from infra import models
 from infra.db import SessionLocal
@@ -34,7 +34,12 @@ def ingest_document(job_id: str | None, tenant_id: str, dataset_id: str, documen
             job.progress = 10
             job.error = None
             db.commit()
-        text, lang = parser.parse_text(path, mime_type)
+        local_path, cleanup = storage.ensure_local_path(path)
+        try:
+            text, lang = parser.parse_text(local_path, mime_type)
+        finally:
+            if cleanup:
+                cleanup()
         if job:
             job.progress = 40
             db.commit()

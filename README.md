@@ -178,6 +178,7 @@ class QueryRewriter:
 ## Runtime Defaults
 - API listens on port `7615` (override via env).
 - Metadata store defaults to Postgres (`postgresql://raglite:raglite@localhost:5432/raglite`); override with `RAGLITE_POSTGRES_DSN` if needed.
+- Object store defaults to local disk at `RAGLITE_OBJECT_STORE_ROOT` (`./data`). For S3-compatible storage set `RAGLITE_OBJECT_STORE_BACKEND=s3` and configure `RAGLITE_S3_BUCKET`, `RAGLITE_S3_ACCESS_KEY`, `RAGLITE_S3_SECRET_KEY`, and optional `RAGLITE_S3_ENDPOINT`, `RAGLITE_S3_REGION`, `RAGLITE_S3_SECURE`, `RAGLITE_S3_PREFIX`.
 - Production hardening: set `RAGLITE_ENV=prod`, disable bootstrap keys (`RAGLITE_ENABLE_BOOTSTRAP=false`), set `RAGLITE_ALLOWED_ORIGINS` for CORS, point `RAGLITE_POSTGRES_DSN`/`RAGLITE_REDIS_URL`/`RAGLITE_QDRANT_URL` to production services.
 
 ## Embedding Configuration
