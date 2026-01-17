@@ -1,7 +1,9 @@
 import uuid
+from pathlib import Path
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import requests
 
@@ -416,6 +418,41 @@ async def delete_dataset(dataset_id: str, tenant: TenantContext = Depends(get_te
 async def delete_document(document_id: str, tenant: TenantContext = Depends(get_tenant), db: Session = Depends(get_db)):
     services.soft_delete_document(db, tenant.tenant_id, document_id)
     return {"status": "accepted", "document_id": document_id}
+
+
+@router.get("/documents/{document_id}/download", tags=["documents"])
+async def download_document(
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    tenant: TenantContext = Depends(get_tenant),
+    db: Session = Depends(get_db),
+):
+    doc = (
+        db.query(models.Document)
+        .filter(
+            models.Document.id == document_id,
+            models.Document.tenant_id == tenant.tenant_id,
+            models.Document.deleted_at.is_(None),
+        )
+        .first()
+    )
+    if not doc or not doc.path:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    filename = doc.filename or Path(doc.path).name or doc.id
+    media_type = doc.mime_type or "application/octet-stream"
+    if storage.is_s3_path(doc.path):
+        try:
+            local_path, cleanup = storage.download_to_temp(doc.path)
+        except Exception:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+        if cleanup:
+            background_tasks.add_task(cleanup)
+        return FileResponse(local_path, filename=filename, media_type=media_type, background=background_tasks)
+    path = Path(doc.path).resolve()
+    root = Path(settings.object_store_root).resolve()
+    if root not in path.parents or not path.is_file():
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document file not found")
+    return FileResponse(str(path), filename=filename, media_type=media_type)
 
 
 @router.get("/jobs/{job_id}", tags=["jobs"], response_model=JobOut)

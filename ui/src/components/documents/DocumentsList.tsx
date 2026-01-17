@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import type { DragEvent } from 'react';
-import { Trash2, Upload, FileText, RefreshCw, Pencil } from 'lucide-react';
+import { Trash2, Upload, FileText, RefreshCw, Pencil, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -10,6 +10,8 @@ import { useTenants } from '@/hooks/useTenants';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import type { Document } from '@/types/document';
+import { api } from '@/lib/api';
+import { API_ENDPOINTS } from '@/lib/constants';
 import {
   Dialog,
   DialogContent,
@@ -86,6 +88,42 @@ export function DocumentsList() {
       setUploadFiles(event.dataTransfer.files);
     }
   }, []);
+
+  const extractFilename = (disposition?: string) => {
+    if (!disposition) return undefined;
+    const utfMatch = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utfMatch?.[1]) {
+      try {
+        return decodeURIComponent(utfMatch[1]);
+      } catch {
+        return utfMatch[1];
+      }
+    }
+    const asciiMatch = disposition.match(/filename=\"?([^\";]+)\"?/i);
+    return asciiMatch?.[1];
+  };
+
+  const handleDownload = async (doc: Document) => {
+    try {
+      const response = await api.get(API_ENDPOINTS.DOCUMENT_DOWNLOAD(doc.id), {
+        params: { dataset_id: doc.dataset_id },
+        responseType: 'blob',
+      });
+      const disposition = response.headers['content-disposition'] as string | undefined;
+      const filename = extractFilename(disposition) || doc.filename || `document-${doc.id}`;
+      const blobUrl = window.URL.createObjectURL(response.data);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Failed to download document:', error);
+      alert('Failed to download document.');
+    }
+  };
 
   const formatFileSize = (bytes?: number | null) => {
     if (!bytes) return '-';
@@ -217,6 +255,14 @@ export function DocumentsList() {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDownload(doc)}
+                          title="Download"
+                        >
+                          <Download className="h-4 w-4" />
+                        </Button>
                         <Button
                           variant="ghost"
                           size="icon"

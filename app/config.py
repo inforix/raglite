@@ -60,7 +60,15 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     postgres_dsn: str = "postgresql://raglite:raglite@localhost:5432/raglite"
     qdrant_url: HttpUrl | str = "http://localhost:6333"
+    object_store_backend: str = "local"  # local|s3
     object_store_root: str = "./data"
+    s3_endpoint: Optional[str] = None
+    s3_bucket: Optional[str] = None
+    s3_region: Optional[str] = None
+    s3_access_key: Optional[str] = None
+    s3_secret_key: Optional[str] = None
+    s3_secure: bool = True
+    s3_prefix: str = ""
 
     # Security
     jwt_secret_key: str = "your-secret-key-change-in-production"
@@ -79,6 +87,16 @@ class Settings(BaseSettings):
                 raise ValueError("Insecure configuration: jwt_secret_key must be changed in production!")
             if self.enable_bootstrap and self.bootstrap_api_key == "dev-secret-key":
                 raise ValueError("Insecure configuration: bootstrap_api_key must be changed in production if bootstrap is enabled!")
+        if self.object_store_backend.lower() == "s3":
+            missing = []
+            if not self.s3_bucket:
+                missing.append("s3_bucket")
+            if not self.s3_access_key:
+                missing.append("s3_access_key")
+            if not self.s3_secret_key:
+                missing.append("s3_secret_key")
+            if missing:
+                raise ValueError(f"S3 backend requires: {', '.join(missing)}")
         return self
 
 

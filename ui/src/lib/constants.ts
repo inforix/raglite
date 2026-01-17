@@ -19,6 +19,7 @@ export const API_ENDPOINTS = {
   DOCUMENTS: '/v1/documents',
   DOCUMENT: (id: string) => `/v1/documents/${id}`,
   DOCUMENT_UPLOAD: '/v1/documents/upload',
+  DOCUMENT_DOWNLOAD: (id: string) => `/v1/documents/${id}/download`,
   
   // Query
   QUERY: '/v1/query',
