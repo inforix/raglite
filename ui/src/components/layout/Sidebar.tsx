@@ -27,15 +27,22 @@ export function Sidebar() {
       )}
     >
       {/* Logo/Header */}
-      <div
-        className={cn(
-          'h-16 flex items-center px-4 border-b',
-          sidebarCollapsed ? 'justify-end' : 'justify-between'
-        )}
-      >
-        {!sidebarCollapsed && (
-          <h1 className="text-xl font-bold">RAGLite</h1>
-        )}
+      <div className="h-16 flex items-center px-4 border-b justify-between">
+        <div
+          className={cn(
+            'flex items-center gap-2 min-w-0',
+            sidebarCollapsed && 'justify-center flex-1'
+          )}
+        >
+          <img
+            src="/ui/rag.svg"
+            alt="RAGLite"
+            className="h-7 w-7 shrink-0"
+          />
+          {!sidebarCollapsed && (
+            <h1 className="text-xl font-bold truncate">RAGLite</h1>
+          )}
+        </div>
         <TooltipProvider delayDuration={0}>
           <Tooltip>
             <TooltipTrigger asChild>
