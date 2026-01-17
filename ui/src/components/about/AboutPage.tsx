@@ -20,6 +20,15 @@ const stackSections = [
   },
 ];
 
+const featureItems = [
+  'Spec-driven ingestion and retrieval',
+  'Vector + BM25 hybrid search',
+  'Optional reranking for higher precision',
+  'Streaming chat with citations',
+  'Multi-tenant access control',
+  'Local or S3-compatible file storage',
+];
+
 export function AboutPage() {
   const appVersion = __APP_VERSION__ || 'dev';
 
@@ -32,8 +41,8 @@ export function AboutPage() {
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
+      <div className="space-y-6">
+        <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Sparkles className="h-5 w-5 text-muted-foreground" />
@@ -61,6 +70,30 @@ export function AboutPage() {
                 </div>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Authors</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              <li>WANG Yuping</li>
+            </ul>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Features</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1 text-sm text-muted-foreground">
+              {featureItems.map((item) => (
+                <li key={item}>- {item}</li>
+              ))}
+            </ul>
           </CardContent>
         </Card>
 
