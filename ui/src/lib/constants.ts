@@ -3,6 +3,7 @@ export const API_ENDPOINTS = {
   LOGIN: '/v1/auth/login',
   LOGOUT: '/v1/auth/logout',
   ME: '/v1/auth/me',
+  PROFILE: '/v1/auth/profile',
   REFRESH: '/v1/auth/refresh',
   
   // Tenants

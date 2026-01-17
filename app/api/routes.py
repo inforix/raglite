@@ -29,7 +29,7 @@ from app.schemas import (
     ModelConfigUpdate,
 )
 from app.schemas_tenant import TenantCreate, TenantOut, TenantApiKeyOut
-from app.schemas_auth import LoginRequest, LoginResponse, UserOut
+from app.schemas_auth import LoginRequest, LoginResponse, UserOut, UserProfileOut, UserProfileUpdate
 from app.auth import get_current_user as get_current_user_dep, get_current_superuser as get_current_superuser_dep
 from core import answerer, embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
@@ -45,6 +45,7 @@ from app.settings_service import (
     delete_model_config,
     get_allowed_model_names,
 )
+from app.user_profile_service import get_or_create_user_profile, update_user_profile
 
 router = APIRouter()
 settings = get_settings()
@@ -586,6 +587,7 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)):
     # Create access token
     access_token = create_access_token(data={"sub": user.id})
     
+    profile = get_or_create_user_profile(db, user.id)
     return LoginResponse(
         access_token=access_token,
         token_type="bearer",
@@ -594,21 +596,37 @@ async def login(payload: LoginRequest, db: Session = Depends(get_db)):
             email=user.email,
             name=user.name,
             is_active=user.is_active,
-            is_superuser=user.is_superuser
+            is_superuser=user.is_superuser,
+            profile=UserProfileOut(show_quick_start=profile.show_quick_start),
         )
     )
 
 
 @router.get("/auth/me", tags=["auth"], response_model=UserOut)
-async def get_current_user(current_user: User = Depends(get_current_user_dep)):
+async def get_current_user(
+    current_user: User = Depends(get_current_user_dep),
+    db: Session = Depends(get_db),
+):
     """Get current user info from JWT token."""
+    profile = get_or_create_user_profile(db, current_user.id)
     return UserOut(
         id=current_user.id,
         email=current_user.email,
         name=current_user.name,
         is_active=current_user.is_active,
-        is_superuser=current_user.is_superuser
+        is_superuser=current_user.is_superuser,
+        profile=UserProfileOut(show_quick_start=profile.show_quick_start),
     )
+
+
+@router.put("/auth/profile", tags=["auth"], response_model=UserProfileOut)
+async def update_profile(
+    payload: UserProfileUpdate,
+    current_user: User = Depends(get_current_user_dep),
+    db: Session = Depends(get_db),
+):
+    profile = update_user_profile(db, current_user.id, payload.show_quick_start)
+    return UserProfileOut(show_quick_start=profile.show_quick_start)
 
 
 @router.post("/auth/logout", tags=["auth"])

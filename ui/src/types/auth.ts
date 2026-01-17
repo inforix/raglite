@@ -2,6 +2,11 @@ export interface User {
   id: string;
   email: string;
   name?: string;
+  profile?: UserProfile;
+}
+
+export interface UserProfile {
+  show_quick_start: boolean;
 }
 
 export interface LoginRequest {
