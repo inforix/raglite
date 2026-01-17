@@ -10,9 +10,11 @@ def save_upload_file(root: str, tenant_id: str, dataset_id: str, document_id: st
     """
     Save uploaded file to object store root and return (path, size_bytes, sha256).
     """
+
     base = Path(root) / "tenants" / tenant_id / dataset_id / document_id
     base.mkdir(parents=True, exist_ok=True)
-    filename = upload.filename or "upload"
+    from core.security import secure_filename
+    filename = secure_filename(upload.filename or "upload")
     dest = base / filename
     sha = hashlib.sha256()
     size = 0
@@ -31,6 +33,8 @@ def save_upload_file(root: str, tenant_id: str, dataset_id: str, document_id: st
 def save_bytes(root: str, tenant_id: str, dataset_id: str, document_id: str, filename: str, data: bytes) -> str:
     base = Path(root) / "tenants" / tenant_id / dataset_id / document_id
     base.mkdir(parents=True, exist_ok=True)
+    from core.security import secure_filename
+    filename = secure_filename(filename)
     dest = base / filename
     dest.write_bytes(data)
     return str(dest)

@@ -30,7 +30,7 @@ from app.schemas import (
 )
 from app.schemas_tenant import TenantCreate, TenantOut, TenantApiKeyOut
 from app.schemas_auth import LoginRequest, LoginResponse, UserOut
-from app.auth import get_current_user as get_current_user_dep
+from app.auth import get_current_user as get_current_user_dep, get_current_superuser as get_current_superuser_dep
 from core import answerer, embedder, rewriter, reranker, vectorstore, opensearch_bm25
 from core import storage
 from infra import models
@@ -69,7 +69,7 @@ async def get_settings_endpoint(db: Session = Depends(get_db), current_user: Use
 async def update_settings_endpoint(
     payload: SettingsUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ) -> SettingsOut:
     allowed_embedders = get_allowed_model_names(db, ModelType.embedder)
     allowed_chat_models = get_allowed_model_names(db, ModelType.chat)
@@ -91,7 +91,7 @@ async def update_settings_endpoint(
 async def create_embedder_model(
     payload: ModelConfigCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = create_model_config(db, ModelType.embedder, payload)
     return ModelConfigOut.model_validate(mc, from_attributes=True)
@@ -102,7 +102,7 @@ async def update_embedder_model(
     model_id: str,
     payload: ModelConfigUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = update_model_config(db, model_id, ModelType.embedder, payload)
     return ModelConfigOut.model_validate(mc, from_attributes=True)
@@ -112,7 +112,7 @@ async def update_embedder_model(
 async def delete_embedder_model(
     model_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ):
     delete_model_config(db, model_id, ModelType.embedder)
     return {}
@@ -122,7 +122,7 @@ async def delete_embedder_model(
 async def create_chat_model(
     payload: ModelConfigCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = create_model_config(db, ModelType.chat, payload)
     return ModelConfigOut.model_validate(mc, from_attributes=True)
@@ -133,7 +133,7 @@ async def update_chat_model(
     model_id: str,
     payload: ModelConfigUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = update_model_config(db, model_id, ModelType.chat, payload)
     return ModelConfigOut.model_validate(mc, from_attributes=True)
@@ -143,7 +143,7 @@ async def update_chat_model(
 async def delete_chat_model(
     model_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user_dep),
+    current_user: User = Depends(get_current_superuser_dep),
 ):
     delete_model_config(db, model_id, ModelType.chat)
     return {}
@@ -232,6 +232,9 @@ async def upload_documents(
             detail=f"Too many files; max {settings.max_files_per_upload}",
         )
     if source_uri:
+        from core.security import is_safe_url
+        if not is_safe_url(source_uri):
+             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unsafe source_uri")
         try:
             resp = requests.get(source_uri, timeout=settings.parse_timeout_seconds)
             resp.raise_for_status()

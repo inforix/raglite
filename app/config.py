@@ -2,7 +2,7 @@ from functools import lru_cache
 from typing import List, Optional
 
 from pydantic_settings import BaseSettings
-from pydantic import Field, HttpUrl
+from pydantic import Field, HttpUrl, model_validator
 
 
 class Settings(BaseSettings):
@@ -61,10 +61,24 @@ class Settings(BaseSettings):
     qdrant_url: HttpUrl | str = "http://localhost:6333"
     object_store_root: str = "./data"
 
+    # Security
+    jwt_secret_key: str = "your-secret-key-change-in-production"
+    jwt_algorithm: str = "HS256"
+    jwt_access_token_expire_minutes: int = 60 * 24  # 24 hours
+
     class Config:
         env_prefix = "RAGLITE_"
         env_file = ".env"
         case_sensitive = False
+
+    @model_validator(mode="after")
+    def check_security_settings(self):
+        if self.environment.lower() != "dev":
+            if self.jwt_secret_key == "your-secret-key-change-in-production":
+                raise ValueError("Insecure configuration: jwt_secret_key must be changed in production!")
+            if self.enable_bootstrap and self.bootstrap_api_key == "dev-secret-key":
+                raise ValueError("Insecure configuration: bootstrap_api_key must be changed in production if bootstrap is enabled!")
+        return self
 
 
 @lru_cache(maxsize=1)
