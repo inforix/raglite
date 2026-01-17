@@ -70,6 +70,20 @@ services:
         soft: 65536
         hard: 65536
 
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: raglite-rustfs
+    profiles:
+      - s3
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      - RUSTFS_ACCESS_KEY=${RAGLITE_S3_ACCESS_KEY:-raglite}
+      - RUSTFS_SECRET_KEY=${RAGLITE_S3_SECRET_KEY:-raglite123}
+    volumes:
+      - rustfs_data:/data
+
   api:
     build:
       context: .
@@ -85,6 +99,15 @@ services:
       - RAGLITE_OPENSEARCH_VERIFY_CERTS=${RAGLITE_OPENSEARCH_VERIFY_CERTS:-false}
       - RAGLITE_ENVIRONMENT=${RAGLITE_ENVIRONMENT:-prod}
       - RAGLITE_LOG_LEVEL=${RAGLITE_LOG_LEVEL:-INFO}
+      - RAGLITE_OBJECT_STORE_BACKEND=${RAGLITE_OBJECT_STORE_BACKEND:-local}
+      - RAGLITE_OBJECT_STORE_ROOT=${RAGLITE_OBJECT_STORE_ROOT:-./data}
+      - RAGLITE_S3_ENDPOINT=${RAGLITE_S3_ENDPOINT:-http://rustfs:9000}
+      - RAGLITE_S3_BUCKET=${RAGLITE_S3_BUCKET:-raglite}
+      - RAGLITE_S3_ACCESS_KEY=${RAGLITE_S3_ACCESS_KEY:-raglite}
+      - RAGLITE_S3_SECRET_KEY=${RAGLITE_S3_SECRET_KEY:-raglite123}
+      - RAGLITE_S3_SECURE=${RAGLITE_S3_SECURE:-false}
+      - RAGLITE_S3_REGION=${RAGLITE_S3_REGION:-us-east-1}
+      - RAGLITE_S3_PREFIX=${RAGLITE_S3_PREFIX:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -116,6 +139,15 @@ services:
       - RAGLITE_OPENSEARCH_VERIFY_CERTS=${RAGLITE_OPENSEARCH_VERIFY_CERTS:-false}
       - RAGLITE_ENVIRONMENT=${RAGLITE_ENVIRONMENT:-prod}
       - RAGLITE_LOG_LEVEL=${RAGLITE_LOG_LEVEL:-INFO}
+      - RAGLITE_OBJECT_STORE_BACKEND=${RAGLITE_OBJECT_STORE_BACKEND:-local}
+      - RAGLITE_OBJECT_STORE_ROOT=${RAGLITE_OBJECT_STORE_ROOT:-./data}
+      - RAGLITE_S3_ENDPOINT=${RAGLITE_S3_ENDPOINT:-http://rustfs:9000}
+      - RAGLITE_S3_BUCKET=${RAGLITE_S3_BUCKET:-raglite}
+      - RAGLITE_S3_ACCESS_KEY=${RAGLITE_S3_ACCESS_KEY:-raglite}
+      - RAGLITE_S3_SECRET_KEY=${RAGLITE_S3_SECRET_KEY:-raglite123}
+      - RAGLITE_S3_SECURE=${RAGLITE_S3_SECURE:-false}
+      - RAGLITE_S3_REGION=${RAGLITE_S3_REGION:-us-east-1}
+      - RAGLITE_S3_PREFIX=${RAGLITE_S3_PREFIX:-}
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,3 +165,4 @@ volumes:
   qdrant_data:
   redis_data:
   opensearch_data:
+  rustfs_data:
