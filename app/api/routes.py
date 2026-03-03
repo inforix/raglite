@@ -1,6 +1,8 @@
 import uuid
+import hashlib
 from pathlib import Path
 from typing import List, Optional
+from urllib.parse import urlparse
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
@@ -55,20 +57,99 @@ vs = vectorstore.get_vector_store()
 bm25_client = opensearch_bm25.get_bm25_client()
 
 
-@router.get("/settings", tags=["settings"], response_model=SettingsOut)
-async def get_settings_endpoint(db: Session = Depends(get_db), current_user: User = Depends(get_current_user_dep)) -> SettingsOut:
-    app_settings = get_app_settings_db(db)
-    embedders = get_model_configs(db, ModelType.embedder)
-    chat_models = get_model_configs(db, ModelType.chat)
-    rerank_models = get_model_configs(db, ModelType.rerank)
+def _redact_model_config(mc: models.ModelConfig) -> ModelConfigOut:
+    return ModelConfigOut(
+        id=mc.id,
+        name=mc.name,
+        endpoint=mc.endpoint,
+        api_key=None,
+        model=mc.model,
+        type=mc.type,
+    )
+
+
+def _build_settings_out(db: Session, app_settings: models.AppSettings) -> SettingsOut:
     return SettingsOut(
         default_embedder=app_settings.default_embedder,
         default_chat_model=app_settings.default_chat_model,
         default_rerank_model=app_settings.default_rerank_model,
-        embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in embedders],
-        chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in chat_models],
-        rerank_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in rerank_models],
+        embedders=[_redact_model_config(m) for m in get_model_configs(db, ModelType.embedder)],
+        chat_models=[_redact_model_config(m) for m in get_model_configs(db, ModelType.chat)],
+        rerank_models=[_redact_model_config(m) for m in get_model_configs(db, ModelType.rerank)],
     )
+
+
+def _normalize_mime_type(mime_type: Optional[str]) -> str:
+    return (mime_type or "").split(";", 1)[0].strip().lower()
+
+
+def _validate_allowed_mime_type(mime_type: Optional[str]) -> str:
+    normalized = _normalize_mime_type(mime_type)
+    allowed = {_normalize_mime_type(item) for item in settings.allowed_mime_types}
+    if normalized not in allowed:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Unsupported MIME type: {mime_type}",
+        )
+    return normalized
+
+
+def _cleanup_document_store(tenant_id: str, dataset_id: str, document_id: str) -> None:
+    try:
+        storage.delete_document_store(settings.object_store_root, tenant_id, dataset_id, document_id)
+    except Exception:
+        pass
+
+
+def _fetch_source_uri_data(source_uri: str) -> tuple[str, str, int, str, bytes]:
+    from core.security import is_safe_url
+
+    if not is_safe_url(source_uri):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unsafe source_uri")
+
+    max_size = settings.max_file_size_mb * 1024 * 1024
+    try:
+        with requests.get(
+            source_uri,
+            timeout=settings.parse_timeout_seconds,
+            stream=True,
+            allow_redirects=False,
+        ) as resp:
+            if 300 <= resp.status_code < 400:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Redirects are not allowed for source_uri",
+                )
+            resp.raise_for_status()
+            mime = _validate_allowed_mime_type(resp.headers.get("content-type"))
+            size = 0
+            digest = hashlib.sha256()
+            data = bytearray()
+            for chunk in resp.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
+                size += len(chunk)
+                if size > max_size:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"File too large; max {settings.max_file_size_mb} MB",
+                    )
+                digest.update(chunk)
+                data.extend(chunk)
+    except HTTPException:
+        raise
+    except requests.RequestException as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch source_uri: {exc}") from exc
+
+    parsed = urlparse(source_uri)
+    filename = Path(parsed.path).name or "remote"
+    return filename, mime, size, digest.hexdigest(), bytes(data)
+
+
+@router.get("/settings", tags=["settings"], response_model=SettingsOut)
+async def get_settings_endpoint(db: Session = Depends(get_db), current_user: User = Depends(get_current_superuser_dep)) -> SettingsOut:
+    app_settings = get_app_settings_db(db)
+    return _build_settings_out(db, app_settings)
 
 
 @router.put("/settings", tags=["settings"], response_model=SettingsOut)
@@ -115,14 +196,7 @@ async def update_settings_endpoint(
         default_rerank_model=target_rerank,
         update_rerank=update_rerank,
     )
-    return SettingsOut(
-        default_embedder=updated.default_embedder,
-        default_chat_model=updated.default_chat_model,
-        default_rerank_model=updated.default_rerank_model,
-        embedders=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.embedder)],
-        chat_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.chat)],
-        rerank_models=[ModelConfigOut.model_validate(m, from_attributes=True) for m in get_model_configs(db, ModelType.rerank)],
-    )
+    return _build_settings_out(db, updated)
 
 
 @router.post("/settings/embedders", tags=["settings"], response_model=ModelConfigOut, status_code=status.HTTP_201_CREATED)
@@ -132,7 +206,7 @@ async def create_embedder_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = create_model_config(db, ModelType.embedder, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.put("/settings/embedders/{model_id}", tags=["settings"], response_model=ModelConfigOut)
@@ -143,7 +217,7 @@ async def update_embedder_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = update_model_config(db, model_id, ModelType.embedder, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.delete("/settings/embedders/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
@@ -163,7 +237,7 @@ async def create_chat_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = create_model_config(db, ModelType.chat, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.put("/settings/chat-models/{model_id}", tags=["settings"], response_model=ModelConfigOut)
@@ -174,7 +248,7 @@ async def update_chat_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = update_model_config(db, model_id, ModelType.chat, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.delete("/settings/chat-models/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
@@ -194,7 +268,7 @@ async def create_rerank_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = create_model_config(db, ModelType.rerank, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.put("/settings/rerank-models/{model_id}", tags=["settings"], response_model=ModelConfigOut)
@@ -205,7 +279,7 @@ async def update_rerank_model(
     current_user: User = Depends(get_current_superuser_dep),
 ) -> ModelConfigOut:
     mc = update_model_config(db, model_id, ModelType.rerank, payload)
-    return ModelConfigOut.model_validate(mc, from_attributes=True)
+    return _redact_model_config(mc)
 
 
 @router.delete("/settings/rerank-models/{model_id}", tags=["settings"], status_code=status.HTTP_204_NO_CONTENT)
@@ -219,33 +293,46 @@ async def delete_rerank_model(
 
 
 @router.post("/tenants", status_code=status.HTTP_201_CREATED, tags=["tenants"], response_model=TenantOut)
-async def create_tenant(payload: TenantCreate, db: Session = Depends(get_db)):
+async def create_tenant(
+    payload: TenantCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+):
     return services.create_tenant_with_key(db, payload)
 
 
 @router.get("/tenants", tags=["tenants"], response_model=List[TenantOut])
-async def list_tenants(db: Session = Depends(get_db)):
+async def list_tenants(db: Session = Depends(get_db), current_user: User = Depends(get_current_superuser_dep)):
     return services.list_tenants(db)
 
 
 @router.get("/tenants/{tenant_id}", tags=["tenants"], response_model=TenantOut)
-async def get_tenant_by_id(tenant_id: str, db: Session = Depends(get_db)):
+async def get_tenant_by_id(tenant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_superuser_dep)):
     return services.get_tenant(db, tenant_id)
 
 
 @router.put("/tenants/{tenant_id}", tags=["tenants"], response_model=TenantOut)
-async def update_tenant(tenant_id: str, payload: TenantCreate, db: Session = Depends(get_db)):
+async def update_tenant(
+    tenant_id: str,
+    payload: TenantCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+):
     return services.update_tenant(db, tenant_id, payload)
 
 
 @router.delete("/tenants/{tenant_id}", status_code=status.HTTP_204_NO_CONTENT, tags=["tenants"])
-async def delete_tenant(tenant_id: str, db: Session = Depends(get_db)):
+async def delete_tenant(tenant_id: str, db: Session = Depends(get_db), current_user: User = Depends(get_current_superuser_dep)):
     services.delete_tenant(db, tenant_id)
     return {}
 
 
 @router.post("/tenants/{tenant_id}/regenerate-key", tags=["tenants"], response_model=TenantApiKeyOut)
-async def regenerate_tenant_key(tenant_id: str, db: Session = Depends(get_db)):
+async def regenerate_tenant_key(
+    tenant_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_superuser_dep),
+):
     return services.regenerate_tenant_api_key(db, tenant_id)
 
 
@@ -301,43 +388,37 @@ async def upload_documents(
             detail=f"Too many files; max {settings.max_files_per_upload}",
         )
     if source_uri:
-        from core.security import is_safe_url
-        if not is_safe_url(source_uri):
-             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or unsafe source_uri")
-        try:
-            resp = requests.get(source_uri, timeout=settings.parse_timeout_seconds)
-            resp.raise_for_status()
-            filename = source_uri.split("/")[-1] or "remote"
+        filename, mime, size, content_hash, remote_data = _fetch_source_uri_data(source_uri)
+        dup = find_duplicate_document(db, tenant.tenant_id, dataset_id, content_hash)
+        if not dup:
             doc_id = str(uuid.uuid4())
             path = storage.save_bytes(
-                settings.object_store_root, tenant.tenant_id, dataset_id, doc_id, filename, resp.content
+                settings.object_store_root,
+                tenant.tenant_id,
+                dataset_id,
+                doc_id,
+                filename,
+                remote_data,
             )
-            mime = resp.headers.get("content-type", "application/octet-stream")
-            size = len(resp.content)
-            content_hash = storage.compute_hash(resp.content)
             uploads.append((doc_id, filename, mime, size, path, content_hash, None))
-        except Exception as e:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Failed to fetch source_uri: {e}")
 
     for f in incoming_files:
-        if f.content_type not in settings.allowed_mime_types:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Unsupported MIME type: {f.content_type}",
-            )
+        mime = _validate_allowed_mime_type(f.content_type)
         doc_id = str(uuid.uuid4())
         path, size, content_hash = storage.save_upload_file(
             settings.object_store_root, tenant.tenant_id, dataset_id, doc_id, f
         )
         if size > settings.max_file_size_mb * 1024 * 1024:
+            _cleanup_document_store(tenant.tenant_id, dataset_id, doc_id)
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File too large; max {settings.max_file_size_mb} MB",
             )
         dup = find_duplicate_document(db, tenant.tenant_id, dataset_id, content_hash)
         if dup:
+            _cleanup_document_store(tenant.tenant_id, dataset_id, doc_id)
             continue  # skip duplicates
-        uploads.append((doc_id, f.filename or "upload", f.content_type, size, path, content_hash, None))
+        uploads.append((doc_id, f.filename or "upload", mime, size, path, content_hash, None))
     if not uploads:
         return DocumentUploadResponse(job_ids=[])
     docs = services.record_documents(db, tenant.tenant_id, dataset_id, uploads)

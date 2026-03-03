@@ -47,8 +47,6 @@ def custom_openapi():
     for path, path_item in openapi_schema["paths"].items():
         if path in ["/health", "/health/storage"]:
             continue
-        if path == "/v1/tenants" and "post" in path_item:
-            continue  # Creating tenant doesn't require auth
         for method in path_item:
             if method in ["get", "post", "put", "delete", "patch"]:
                 path_item[method]["security"] = [{"BearerAuth": []}]

@@ -67,22 +67,12 @@ def get_tenant(
     """
     Resolve tenant context from either an API key or a JWT bearer token.
     - API key: Authorization: Bearer <api_key> (or raw value)
-    - JWT: Authorization: Bearer <jwt>; requires tenant_id in query/header or falls back to bootstrap tenant.
+    - JWT: Authorization: Bearer <jwt>; requires explicit tenant_id in query/header.
     """
     if not authorization:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing Authorization header")
 
     requested_tenant = x_tenant_id or tenant_id
-    if not requested_tenant and dataset_id:
-        ds = db.query(models.Dataset).filter(models.Dataset.id == dataset_id).first()
-        if ds:
-            requested_tenant = ds.tenant_id
-    if not requested_tenant:
-        first_tenant = db.query(models.Tenant).order_by(models.Tenant.created_at).first()
-        if first_tenant:
-            requested_tenant = first_tenant.id
-        elif settings.bootstrap_tenant_id:
-            requested_tenant = settings.bootstrap_tenant_id
 
     bearer_value: Optional[str] = None
     api_key: Optional[str] = None
@@ -92,13 +82,17 @@ def get_tenant(
     else:
         api_key = authorization
 
-    # Try JWT first; if invalid, fall back to API key handling
+    # Try JWT first; only fall back to API key handling when JWT decoding fails.
     if bearer_value:
         try:
             payload = decode_access_token(bearer_value)
+        except HTTPException:
+            api_key = bearer_value
+        else:
             user_id = payload.get("sub")
             if not user_id:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
             user = (
                 db.query(models.User)
                 .filter(models.User.id == user_id, models.User.is_active.is_(True))
@@ -106,15 +100,24 @@ def get_tenant(
             )
             if not user:
                 raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found or inactive")
-            tenant_val = requested_tenant or settings.bootstrap_tenant_id
-            if not tenant_val:
+
+            if not requested_tenant:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="tenant_id is required for this request",
+                    detail="tenant_id is required for JWT requests",
                 )
-            return TenantContext(tenant_id=tenant_val, api_key="")
-        except HTTPException:
-            api_key = bearer_value
+
+            tenant = db.query(models.Tenant).filter(models.Tenant.id == requested_tenant).first()
+            if not tenant:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant not found")
+
+            if not user.is_superuser:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="The user doesn't have enough privileges",
+                )
+
+            return TenantContext(tenant_id=tenant.id, api_key="")
 
     if api_key:
         tenant_from_key = _lookup_api_key_db(api_key, db=db) or _API_KEYS.get(api_key)
