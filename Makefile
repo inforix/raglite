@@ -9,7 +9,7 @@ UI_SRC := $(shell find ui/src -type f)
 ENV_FILE := .env
 ENV_EXAMPLE := .env.example
 
-.PHONY: dev build stop clean ui-build
+.PHONY: dev build stop clean ui-build test test-api test-ui
 
 dev: $(ENV_FILE) $(UI_BUILD)
 	$(DEV_COMPOSE) up -d
@@ -31,6 +31,15 @@ clean: stop
 	rm -rf .pytest_cache ui/dist ui/node_modules
 
 ui-build: $(UI_BUILD)
+
+test: test-api test-ui
+
+test-api:
+	uv sync --extra dev
+	uv run pytest -q
+
+test-ui:
+	cd ui && bun install --frozen-lockfile --save-text-lockfile && bun run build
 
 $(ENV_FILE):
 	@if [ ! -f "$(ENV_FILE)" ] && [ -f "$(ENV_EXAMPLE)" ]; then \
