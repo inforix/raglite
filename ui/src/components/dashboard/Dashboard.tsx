@@ -15,33 +15,37 @@ export function Dashboard() {
   const { user, token, setAuth } = useAuthStore();
   const [showQuickStart, setShowQuickStart] = useState(true);
   const tenantsQuery = useTenants();
-  const datasetsQuery = useDatasets();
+  const selectedTenantId = tenantsQuery.data?.[0]?.id;
+  const datasetsQuery = useDatasets(selectedTenantId);
   const documentsQuery = useQuery<number, Error>({
-    queryKey: ['documents-count'],
+    queryKey: ['documents-count', selectedTenantId],
     queryFn: async () => {
       const response = await api.get<DocumentListResponse>(API_ENDPOINTS.DOCUMENTS, {
-        params: { page_size: 1 },
+        params: { page_size: 1, tenant_id: selectedTenantId },
       });
       return response.data.total;
     },
+    enabled: !!selectedTenantId,
   });
   const queriesQuery = useQuery<number, Error>({
-    queryKey: QUERY_KEYS.QUERIES_COUNT,
+    queryKey: [...QUERY_KEYS.QUERIES_COUNT, selectedTenantId],
     queryFn: async () => {
       const response = await api.get<QueryHistoryResponse>(API_ENDPOINTS.QUERY_HISTORY, {
-        params: { page_size: 1 },
+        params: { page_size: 1, tenant_id: selectedTenantId },
       });
       return response.data.total;
     },
+    enabled: !!selectedTenantId,
   });
   const dailyQueriesQuery = useQuery<QueryDailyStatsResponse, Error>({
-    queryKey: QUERY_KEYS.QUERIES_DAILY,
+    queryKey: [...QUERY_KEYS.QUERIES_DAILY, selectedTenantId],
     queryFn: async () => {
       const response = await api.get<QueryDailyStatsResponse>(API_ENDPOINTS.QUERY_STATS_DAILY, {
-        params: { days: 14 },
+        params: { days: 14, tenant_id: selectedTenantId },
       });
       return response.data;
     },
+    enabled: !!selectedTenantId,
   });
 
   const formatMetric = (value: number | undefined, isLoading: boolean, isError: boolean) => {

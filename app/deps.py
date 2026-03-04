@@ -59,7 +59,7 @@ def _rate_limit(tenant_id: str):
 
 def get_tenant(
     authorization: Optional[str] = Header(None, convert_underscores=False),
-    x_tenant_id: Optional[str] = Header(None, convert_underscores=False),
+    x_tenant_id: Optional[str] = Header(None),
     tenant_id: Optional[str] = None,
     dataset_id: Optional[str] = None,
     db: Session = Depends(get_db),

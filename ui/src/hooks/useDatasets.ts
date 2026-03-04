@@ -11,6 +11,7 @@ export function useDatasets(tenantId?: string) {
       const response = await api.get<Dataset[]>(API_ENDPOINTS.DATASETS, { params });
       return response.data;
     },
+    enabled: !!tenantId,
   });
 }
 
@@ -19,39 +20,46 @@ export function useCreateDataset() {
 
   return useMutation({
     mutationFn: async (data: CreateDatasetRequest) => {
-      const response = await api.post<Dataset>(API_ENDPOINTS.DATASETS, data);
+      const { tenant_id, ...payload } = data;
+      const response = await api.post<Dataset>(API_ENDPOINTS.DATASETS, payload, {
+        params: { tenant_id },
+      });
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DATASETS() });
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
     },
   });
 }
 
-export function useUpdateDataset(id: string) {
+export function useUpdateDataset(id: string, tenantId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: UpdateDatasetRequest) => {
-      const response = await api.put<Dataset>(API_ENDPOINTS.DATASET(id), data);
+      const response = await api.put<Dataset>(API_ENDPOINTS.DATASET(id), data, {
+        params: tenantId ? { tenant_id: tenantId } : {},
+      });
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DATASETS() });
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
       queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DATASET(id) });
     },
   });
 }
 
-export function useDeleteDataset() {
+export function useDeleteDataset(tenantId?: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: string) => {
-      await api.delete(API_ENDPOINTS.DATASET(id));
+      await api.delete(API_ENDPOINTS.DATASET(id), {
+        params: tenantId ? { tenant_id: tenantId } : {},
+      });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: QUERY_KEYS.DATASETS() });
+      queryClient.invalidateQueries({ queryKey: ['datasets'] });
     },
   });
 }

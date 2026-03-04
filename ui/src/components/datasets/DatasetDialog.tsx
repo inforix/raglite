@@ -67,7 +67,7 @@ export function DatasetDialog({ open, onClose, dataset }: DatasetDialogProps) {
   const { data: embedderData, isLoading: embeddersLoading } = useEmbedders();
   const { data: rerankData, isLoading: rerankLoading } = useRerankModels();
   const createDataset = useCreateDataset();
-  const updateDataset = useUpdateDataset(dataset?.id || '');
+  const updateDataset = useUpdateDataset(dataset?.id || '', dataset?.tenant_id);
   const defaultEmbedder = embedderData?.defaultEmbedder || '';
   const embedderOptions = embedderData?.embedders || [];
   const firstEmbedder = embedderOptions[0]?.name || '';

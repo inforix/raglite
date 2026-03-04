@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Plus, Trash2, Edit, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +14,7 @@ export function DatasetsList() {
   const [selectedTenantId, setSelectedTenantId] = useState<string>('');
   const { data: tenants } = useTenants();
   const { data: datasets, isLoading, error, refetch } = useDatasets(selectedTenantId || undefined);
-  const deleteDataset = useDeleteDataset();
+  const deleteDataset = useDeleteDataset(selectedTenantId || undefined);
   const [editingDataset, setEditingDataset] = useState<Dataset | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const tenantNameMap = useMemo(() => {
@@ -24,6 +24,12 @@ export function DatasetsList() {
     });
     return map;
   }, [tenants]);
+
+  useEffect(() => {
+    if (!selectedTenantId && tenants && tenants.length > 0) {
+      setSelectedTenantId(tenants[0].id);
+    }
+  }, [selectedTenantId, tenants]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this dataset?')) {
@@ -70,7 +76,7 @@ export function DatasetsList() {
                   value={selectedTenantId}
                   onChange={(e) => setSelectedTenantId(e.target.value)}
                 >
-                  <option value="">All Tenants</option>
+                  <option value="">Select tenant</option>
                   {tenants?.map((tenant) => (
                     <option key={tenant.id} value={tenant.id}>
                       {tenant.name}

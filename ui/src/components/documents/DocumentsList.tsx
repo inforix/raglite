@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { DragEvent } from 'react';
 import { Trash2, Upload, FileText, RefreshCw, Pencil, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -33,10 +33,19 @@ export function DocumentsList() {
   
   const { data: tenants } = useTenants();
   const { data: datasets } = useDatasets(selectedTenantId || undefined);
-  const { data: documents, isLoading, isFetching, refetch } = useDocuments(selectedDatasetId || undefined);
-  const deleteDocument = useDeleteDocument();
-  const uploadDocument = useUploadDocument();
-  const updateDocument = useUpdateDocument();
+  const { data: documents, isLoading, isFetching, refetch } = useDocuments(
+    selectedDatasetId || undefined,
+    selectedTenantId || undefined,
+  );
+  const deleteDocument = useDeleteDocument(selectedTenantId || undefined);
+  const uploadDocument = useUploadDocument(selectedTenantId || undefined);
+  const updateDocument = useUpdateDocument(selectedTenantId || undefined);
+
+  useEffect(() => {
+    if (!selectedTenantId && tenants && tenants.length > 0) {
+      setSelectedTenantId(tenants[0].id);
+    }
+  }, [selectedTenantId, tenants]);
 
   const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this document?')) {
@@ -106,7 +115,7 @@ export function DocumentsList() {
   const handleDownload = async (doc: Document) => {
     try {
       const response = await api.get(API_ENDPOINTS.DOCUMENT_DOWNLOAD(doc.id), {
-        params: { dataset_id: doc.dataset_id },
+        params: { dataset_id: doc.dataset_id, tenant_id: selectedTenantId },
         responseType: 'blob',
       });
       const disposition = response.headers['content-disposition'] as string | undefined;

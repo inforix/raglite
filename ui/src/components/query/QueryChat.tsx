@@ -40,6 +40,12 @@ export function QueryChat() {
   const { data: tenants } = useTenants();
   const { data: datasets } = useDatasets(selectedTenantId || undefined);
 
+  useEffect(() => {
+    if (!selectedTenantId && tenants && tenants.length > 0) {
+      setSelectedTenantId(tenants[0].id);
+    }
+  }, [selectedTenantId, tenants]);
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -143,7 +149,9 @@ export function QueryChat() {
         rewrite: true,
         answer: true,
       };
-      const response = await api.post(API_ENDPOINTS.QUERY, payload);
+      const response = await api.post(API_ENDPOINTS.QUERY, payload, {
+        params: { tenant_id: selectedTenantId },
+      });
       const data = response.data as {
         query: string;
         rewritten?: string;
@@ -217,7 +225,7 @@ export function QueryChat() {
               setSelectedDatasetId('');
             }}
           >
-            <option value="">Select tenant (optional)</option>
+            <option value="">Select tenant</option>
             {tenants?.map((tenant) => (
               <option key={tenant.id} value={tenant.id}>
                 {tenant.name}

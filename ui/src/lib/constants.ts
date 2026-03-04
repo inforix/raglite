@@ -42,7 +42,7 @@ export const QUERY_KEYS = {
   TENANT: (id: string) => ['tenant', id],
   DATASETS: (tenantId?: string) => ['datasets', tenantId],
   DATASET: (id: string) => ['dataset', id],
-  DOCUMENTS: (datasetId?: string) => ['documents', datasetId],
+  DOCUMENTS: (tenantId?: string, datasetId?: string) => ['documents', tenantId, datasetId],
   DOCUMENT: (id: string) => ['document', id],
   ME: ['me'],
   QUERIES_COUNT: ['queries-count'],
